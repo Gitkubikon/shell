@@ -3,6 +3,7 @@ import Quickshell.Io
 JsonObject {
     property bool enabled: true
     property int maxToasts: 4
+    property bool confirmDelete: false
 
     property Sizes sizes: Sizes {}
     property Toasts toasts: Toasts {}

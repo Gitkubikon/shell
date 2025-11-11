@@ -233,7 +233,13 @@ ColumnLayout {
                     label.color: Colours.palette.m3error
                     stateLayer.color: Colours.palette.m3error
                     enabled: true
-                    onClicked: root.props[root.textPrefix.toLowerCase() + "ConfirmDelete"] = item.modelData.path
+                    onClicked: {
+                        if (Config.utilities.confirmDelete) {
+                            root.props[root.textPrefix.toLowerCase() + "ConfirmDelete"] = item.modelData.path;
+                        } else {
+                            CUtils.deleteFile(Qt.resolvedUrl(item.modelData.path));
+                        }
+                    }
                 }
             }
 

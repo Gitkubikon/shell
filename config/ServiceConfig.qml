@@ -17,4 +17,12 @@ JsonObject {
             "to": "YT Music"
         }
     ]
+    property NightLightConfig nightLight: NightLightConfig {}
+
+    component NightLightConfig: JsonObject {
+        property bool automatic: false
+        property string from: "19:00"
+        property string to: "06:30"
+        property int colorTemperature: 4500
+    }
 }

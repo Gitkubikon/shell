@@ -18,7 +18,9 @@ Item {
         anchors.fill: parent
         spacing: Appearance.spacing.normal
 
-    UtilCards.IdleInhibit {}
+        UtilCards.IdleInhibit {}
+
+        UtilCards.NightLight {}
 
         // Combined media card: Screenshots + Recordings in tabs
         UtilCards.Media {
