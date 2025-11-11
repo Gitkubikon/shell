@@ -33,7 +33,11 @@ Item {
         }
     }
 
-    // Empty-state UI (unchanged)
+    Component.onCompleted: {
+        if (source)
+            Qt.callLater(() => one.update());
+    }
+
     Loader {
         anchors.fill: parent
         active: !root.source

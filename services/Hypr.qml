@@ -33,6 +33,8 @@ Singleton {
     readonly property alias options: extras.options
     readonly property alias devices: extras.devices
 
+    property bool hadKeyboard
+
     signal configReloaded
 
     function dispatch(request: string): void {
@@ -44,7 +46,7 @@ Singleton {
     }
 
     function reloadDynamicConfs(): void {
-        extras.batchMessage(["keyword bindln ,Caps_Lock,global,caelestia:refreshDevices", "keyword bindln ,Num_Lock,global,caelestia:refreshDevices"]);
+        extras.batchMessage(["keyword bindlni ,Caps_Lock,global,caelestia:refreshDevices", "keyword bindlni ,Num_Lock,global,caelestia:refreshDevices"]);
     }
 
     Component.onCompleted: reloadDynamicConfs()
@@ -67,6 +69,13 @@ Singleton {
             Toaster.toast(qsTr("Num lock enabled"), qsTr("Num lock is currently enabled"), "looks_one");
         else
             Toaster.toast(qsTr("Num lock disabled"), qsTr("Num lock is currently disabled"), "timer_1");
+    }
+
+    onKbLayoutFullChanged: {
+        if (hadKeyboard && Config.utilities.toasts.kbLayoutChanged)
+            Toaster.toast(qsTr("Keyboard layout changed"), qsTr("Layout changed to: %1").arg(kbLayoutFull), "keyboard");
+
+        hadKeyboard = !!keyboard;
     }
 
     Connections {
@@ -101,7 +110,6 @@ Singleton {
 
         path: Quickshell.env("CAELESTIA_XKB_RULES_PATH") || "/usr/share/X11/xkb/rules/base.lst"
         onLoaded: {
-            // Parse layout section
             const layoutMatch = text().match(/! layout\n([\s\S]*?)\n\n/);
             if (layoutMatch) {
                 const lines = layoutMatch[1].split("\n");
@@ -115,7 +123,6 @@ Singleton {
                 }
             }
 
-            // Parse variant section
             const variantMatch = text().match(/! variant\n([\s\S]*?)\n\n/);
             if (variantMatch) {
                 const lines = variantMatch[1].split("\n");
