@@ -11,26 +11,21 @@ import QtQuick
 Item {
     id: root
 
-    // Current wallpaper path (managed by Caelestia)
     property string source: Wallpapers.current
-
-    // Expose the currently visible image item (for visualiser/shaders)
-    readonly property Item current: activeSlot?.activeChild
-
-    // Track which slot is currently active
-    property Item activeSlot: one
+    property CachingImage current: one
+    readonly property Item imageItem: (current && current.contentItem) ? current.contentItem : null
+    property var sessionLock: null
+    readonly property bool sessionLocked: sessionLock ? sessionLock.secure : false
 
     anchors.fill: parent
 
-    // When the source changes, update the "other" slot to enable a crossfade.
     onSourceChanged: {
-        if (!source) {
-            activeSlot = null;
-        } else {
-            // Update the inactive slot
-            const nextSlot = (activeSlot === one) ? two : one;
-            nextSlot.loadAndBecomeActive(source);
-        }
+        if (!source)
+            current = null;
+        else if (current === one)
+            two.update();
+        else
+            one.update();
     }
 
     Component.onCompleted: {
@@ -40,6 +35,7 @@ Item {
 
     Loader {
         anchors.fill: parent
+
         active: !root.source
         asynchronous: true
 
@@ -76,6 +72,7 @@ Item {
 
                         FileDialog {
                             id: dialog
+
                             title: qsTr("Select a wallpaper")
                             filterLabel: qsTr("Image files")
                             filters: Images.validImageExtensions
@@ -85,12 +82,17 @@ Item {
                         StateLayer {
                             radius: parent.radius
                             color: Colours.palette.m3onPrimary
-                            function onClicked(): void { dialog.open(); }
+
+                            function onClicked(): void {
+                                dialog.open();
+                            }
                         }
 
                         StyledText {
                             id: selectWallText
+
                             anchors.centerIn: parent
+
                             text: qsTr("Set it now!")
                             color: Colours.palette.m3onPrimary
                             font.pointSize: Appearance.font.size.large
@@ -101,153 +103,74 @@ Item {
         }
     }
 
-    // Two slots that we crossfade between
-    Img { id: one }
-    Img { id: two }
+    Img {
+        id: one
+    }
 
-    // ----------------------------------------------------------------------
-    // Img: persistent dual-renderer (static + gif), no Loader, no reparenting
-    // ----------------------------------------------------------------------
-    component Img: Item {
+    Img {
+        id: two
+    }
+
+    component Img: CachingImage {
         id: img
+
+        function update(): void {
+            if (!root.source) return;
+
+            if (path === root.source) {
+                root.current = this;
+                return;
+            }
+
+            const target = root.source;
+            path = target;
+
+            if (img.animated) {
+                Qt.callLater(() => {
+                    if (img.path === target && root.source === target)
+                        root.current = img;
+                });
+            }
+        }
+
         anchors.fill: parent
 
-        // Path we want this slot to display
-        property string path: ""
-
-        // Determine renderer
-        readonly property bool isGif: path && path.toLowerCase().endsWith(".gif")
-
-        // The child that is currently visible (either staticImg or gifImg)
-        readonly property Item activeChild: isGif ? gifImg : staticImg
-
-        // Load new wallpaper and become active when ready
-        function loadAndBecomeActive(newPath: string): void {
-            path = newPath;
-            
-            if (isGif) {
-                staticImg.visible = false;
-                staticImg.path = "";
-                
-                gifImg.source = newPath;
-                gifImg.visible = true;
-            } else {
-                gifImg.visible = false;
-                gifImg.playing = false;
-                gifImg.source = "";
-                
-                staticImg.path = newPath;
-                staticImg.visible = true;
-            }
-            
-            // Check if already ready (sync/cached load)
-            checkAndActivate();
-        }
-
-        // Check if ready and activate this slot
-        function checkAndActivate(): void {
-            if (activeChild.status !== Image.Ready) return;
-            
-            // Start GIF playback
-            if (isGif) {
-                gifImg.currentFrame = 0;
-                gifImg.playing = true;
-            }
-            
-            // Make this slot active
-            root.activeSlot = img;
-        }
-
-        // Crossfade/scale state lives on the slot wrapper
         opacity: 0
         scale: Wallpapers.showPreview ? 1 : 0.8
+        playbackEnabled: root.current === img && !root.sessionLocked
 
-        // --- Static renderer (persistent) ---
-        CachingImage {
-            id: staticImg
-            anchors.fill: parent
-            visible: false
+        onStatusChanged: {
+            if (status === Image.Ready) root.current = this;
+        }
 
-            onStatusChanged: {
-                if (status === Image.Ready && visible) {
-                    img.checkAndActivate();
-                }
+        onPlaybackEnabledChanged: {
+            if (root.current === img && img.animated && playbackEnabled)
+                img.restart();
+        }
+
+        Connections {
+            target: root
+
+            function onCurrentChanged(): void {
+                if (root.current === img && img.animated)
+                    img.restart();
             }
         }
 
-        // --- GIF renderer (persistent AnimatedImage) ---
-        AnimatedImage {
-            id: gifImg
-            anchors.fill: parent
-            visible: false
-            cache: false
-            asynchronous: false
-            playing: false
-            fillMode: Image.PreserveAspectCrop
-
-            onStatusChanged: {
-                if (status === Image.Ready && visible) {
-                    img.checkAndActivate();
-                }
-            }
-
-            onVisibleChanged: {
-                if (!visible) playing = false;
-            }
-        }
-
-        // Animate *this slot* (not the child), to avoid touching decoder items
         states: State {
             name: "visible"
-            when: root.activeSlot === img
-            PropertyChanges { target: img; opacity: 1; scale: 1 }
+            when: root.current === img
+
+            PropertyChanges {
+                img.opacity: 1
+                img.scale: 1
+            }
         }
 
-        transitions: [
-            Transition {
-                to: "visible"
-                ParallelAnimation {
-                    NumberAnimation {
-                        target: img
-                        property: "opacity"
-                        duration: Appearance.anim.durations.large
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Appearance.anim.curves.standard
-                    }
-                    NumberAnimation {
-                        target: img
-                        property: "scale"
-                        duration: Appearance.anim.durations.large
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Appearance.anim.curves.standard
-                    }
-                }
-            },
-            Transition {
-                from: "visible"; to: ""
-                ParallelAnimation {
-                    NumberAnimation {
-                        target: img
-                        property: "opacity"
-                        duration: Appearance.anim.durations.large
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Appearance.anim.curves.standard
-                    }
-                    NumberAnimation {
-                        target: img
-                        property: "scale"
-                        duration: Appearance.anim.durations.large
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Appearance.anim.curves.standard
-                    }
-                }
-            }
-        ]
-
-        // Initialize once at creation
-        Component.onCompleted: {
-            if (root.source && root.activeSlot === img) {
-                loadAndBecomeActive(root.source);
+        transitions: Transition {
+            Anim {
+                target: img
+                properties: "opacity,scale"
             }
         }
     }
