@@ -13,10 +13,9 @@ Scope {
 
         property bool freeze
         property bool closing
+        property bool clipboardOnly: false
         property bool recording: false
         property bool recordWithSound: false
-
-            // no-op
 
         Variants {
             model: Quickshell.screens
@@ -58,6 +57,7 @@ Scope {
         function open(): void {
             root.freeze = false;
             root.closing = false;
+            root.clipboardOnly = false;
             root.recording = false;
             root.recordWithSound = false;
             root.activeAsync = true;
@@ -66,6 +66,25 @@ Scope {
         function openFreeze(): void {
             root.freeze = true;
             root.closing = false;
+            root.clipboardOnly = false;
+            root.recording = false;
+            root.recordWithSound = false;
+            root.activeAsync = true;
+        }
+
+        function openClip(): void {
+            root.freeze = false;
+            root.closing = false;
+            root.clipboardOnly = true;
+            root.recording = false;
+            root.recordWithSound = false;
+            root.activeAsync = true;
+        }
+
+        function openFreezeClip(): void {
+            root.freeze = true;
+            root.closing = false;
+            root.clipboardOnly = true;
             root.recording = false;
             root.recordWithSound = false;
             root.activeAsync = true;
@@ -75,6 +94,7 @@ Scope {
         function openRecord(): void {
             root.freeze = false;
             root.closing = false;
+            root.clipboardOnly = false;
             root.recording = true;
             root.recordWithSound = false;
             root.activeAsync = true;
@@ -83,6 +103,7 @@ Scope {
         function openRecordSound(): void {
             root.freeze = false;
             root.closing = false;
+            root.clipboardOnly = false;
             root.recording = true;
             root.recordWithSound = true;
             root.activeAsync = true;
@@ -95,6 +116,9 @@ Scope {
         onPressed: {
             root.freeze = false;
             root.closing = false;
+            root.clipboardOnly = false;
+            root.recording = false;
+            root.recordWithSound = false;
             root.activeAsync = true;
         }
     }
@@ -105,6 +129,35 @@ Scope {
         onPressed: {
             root.freeze = true;
             root.closing = false;
+            root.clipboardOnly = false;
+            root.recording = false;
+            root.recordWithSound = false;
+            root.activeAsync = true;
+        }
+    }
+
+    CustomShortcut {
+        name: "screenshotClip"
+        description: "Open screenshot tool (clipboard)"
+        onPressed: {
+            root.freeze = false;
+            root.closing = false;
+            root.clipboardOnly = true;
+            root.recording = false;
+            root.recordWithSound = false;
+            root.activeAsync = true;
+        }
+    }
+
+    CustomShortcut {
+        name: "screenshotFreezeClip"
+        description: "Open screenshot tool (freeze mode, clipboard)"
+        onPressed: {
+            root.freeze = true;
+            root.closing = false;
+            root.clipboardOnly = true;
+            root.recording = false;
+            root.recordWithSound = false;
             root.activeAsync = true;
         }
     }

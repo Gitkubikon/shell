@@ -81,14 +81,15 @@ MouseArea {
         // Use consistent rounding to avoid invalid regions
         const screenRelX = Math.floor(rsx);
         const screenRelY = Math.floor(rsy);
-        const screenRelW = Math.max(1, Math.ceil(sw));  // Ensure minimum 1px width
-        const screenRelH = Math.max(1, Math.ceil(sh));  // Ensure minimum 1px height
-        
+        const screenRelW = Math.max(1, Math.ceil(sw));
+        const screenRelH = Math.max(1, Math.ceil(sh));
+        const regionRect = Qt.rect(screenRelX, screenRelY, screenRelW, screenRelH);
+
         // Convert to global logical coordinates
         const globalX = screenRelX + screen.x;
         const globalY = screenRelY + screen.y;
         const region = `${screenRelW}x${screenRelH}+${globalX}+${globalY}`;
-        
+
         if (root.loader.recording) {
             // Use CLI for recording - it handles fractional scaling conversion to physical pixels
             const cmd = ["caelestia", "record", "-r", region];
@@ -98,6 +99,12 @@ MouseArea {
             // Start fast polling for instant recording state detection
             Recorder.startFastPolling();
             Quickshell.execDetached(cmd);
+        } else if (root.loader.clipboardOnly) {
+            const tmpfile = Qt.resolvedUrl(`/tmp/caelestia-picker-${Quickshell.processId}-${Date.now()}.png`);
+            CUtils.saveItem(screencopy, tmpfile, regionRect, path => {
+                Quickshell.execDetached(["sh", "-c", "wl-copy --type image/png < " + path]);
+                Quickshell.execDetached(["notify-send", "-a", "caelestia-cli", "-i", path, "Screenshot taken", "Screenshot copied to clipboard"]);
+            });
         } else {
             // Use CLI for screenshot - it handles notifications and actions
             const cmd = ["caelestia", "screenshot", "-r", region];
@@ -106,7 +113,7 @@ MouseArea {
             }
             Quickshell.execDetached(cmd);
         }
-        
+
         closeAnim.start();
     }
 
