@@ -14,8 +14,13 @@ Item {
     property color colour: Colours.palette.m3primary
 
     readonly property int maxHeight: {
-        const otherModules = bar.children.filter(c => c.id && c.item !== this && c.id !== "spacer");
-        const otherHeight = otherModules.reduce((acc, curr) => acc + (curr.item.nonAnimHeight ?? curr.height), 0);
+        if (!bar || !bar.children)
+            return 0;
+
+        const otherModules = bar.children.filter(
+            c => c && c.id && c.item !== this && c.id !== "spacer"
+        );
+        const otherHeight = otherModules.reduce((acc, curr) => acc + (curr.item?.nonAnimHeight ?? curr.height), 0);
         // Length - 2 cause repeater counts as a child
         return bar.height - otherHeight - bar.spacing * (bar.children.length - 1) - bar.vPadding * 2;
     }

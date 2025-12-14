@@ -5,6 +5,7 @@
 #include <QtQuick/qquickwindow.h>
 #include <qdir.h>
 #include <qfileinfo.h>
+#include <qicon.h>
 #include <qfuturewatcher.h>
 #include <qqmlengine.h>
 
@@ -137,6 +138,27 @@ QString CUtils::toLocalFile(const QUrl& url) const {
     }
 
     return url.toLocalFile();
+}
+
+bool CUtils::fileExists(const QUrl& path) const {
+    if (!path.isValid()) {
+        return false;
+    }
+
+    if (path.isLocalFile()) {
+        return QFileInfo::exists(path.toLocalFile());
+    }
+
+    // Best-effort fallback for other schemes such as qrc
+    return QFileInfo::exists(path.toString());
+}
+
+bool CUtils::themeIconExists(const QString& name) const {
+    if (name.isEmpty()) {
+        return false;
+    }
+
+    return QIcon::hasThemeIcon(name);
 }
 
 } // namespace caelestia

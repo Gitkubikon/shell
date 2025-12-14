@@ -119,6 +119,35 @@ void CachingImageManager::updateSource() {
 
 void CachingImageManager::updateSource(const QString& path) {
     if (path.isEmpty()) {
+        m_shaPath.clear();
+        if (m_animated) {
+            m_animated = false;
+            emit animatedChanged();
+        }
+        if (m_cachePath.isValid()) {
+            m_cachePath = QUrl();
+            emit cachePathChanged();
+        }
+        if (m_item) {
+            m_item->setProperty("source", QUrl());
+        }
+        return;
+    }
+
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isFile()) {
+        m_shaPath.clear();
+        if (m_animated) {
+            m_animated = false;
+            emit animatedChanged();
+        }
+        if (m_cachePath.isValid()) {
+            m_cachePath = QUrl();
+            emit cachePathChanged();
+        }
+        if (m_item) {
+            m_item->setProperty("source", QUrl());
+        }
         return;
     }
 
