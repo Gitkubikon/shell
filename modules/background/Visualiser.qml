@@ -28,10 +28,13 @@ Item {
         Anim {}
     }
 
-    // Keep Audio service alive
-    ServiceRef {
+    // Keep Audio service alive only when needed
+    Loader {
         id: cavaRef
-        service: Audio.cava
+        active: root.shouldBeActive
+        sourceComponent: ServiceRef {
+            service: Audio.cava
+        }
     }
 
     // Bar gradient colors
@@ -66,6 +69,8 @@ Item {
         anchors.leftMargin: Visibilities.bars.get(root.screen).exclusiveZone + Appearance.spacing.small * Config.background.visualiser.spacing
         anchors.margins: Config.border.thickness
 
+        readonly property bool shouldRender: root.shouldBeActive && canvas.visible && Audio.cava.values && Audio.cava.values.length
+
         Canvas {
             id: canvas
             anchors.fill: parent
@@ -76,6 +81,14 @@ Item {
             property var displayValues: Array(barCount * 2).fill(0)
 
             property real smoothing: Math.max(0.01, Math.min(1, 32 / Appearance.anim.durations.small))
+
+            property bool hasAudioEnergy: Audio.cava.values && Audio.cava.values.some(v => v > 0.01)
+
+            function hasDisplayEnergy() {
+                return displayValues.some(v => v > 0.003);
+            }
+
+            visible: root.shouldBeActive
 
             function drawRoundedRect(ctx, x, y, w, h, r) {
                 r = Math.min(r, w / 2, h / 2);
@@ -93,8 +106,8 @@ Item {
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
-                if (!Audio.cava.values)
-                    return;
+
+                var values = Audio.cava.values || [];
 
                 var gradientTopY = height * 0.7;
                 var gradientBottomY = height;
@@ -106,7 +119,7 @@ Item {
 
                 for (var i = 0; i < barCount; i++) {
                     // Left bar
-                    var targetLeft = Math.max(0, Math.min(1, Audio.cava.values[i]));
+                    var targetLeft = Math.max(0, Math.min(1, values[i] || 0));
                     displayValues[i] += (targetLeft - displayValues[i]) * smoothing;
 
                     var xLeft = i * (width * 0.4 / barCount);
@@ -117,7 +130,7 @@ Item {
                     ctx.fill();
 
                     // Right bar
-                    var targetRight = Math.max(0, Math.min(1, Audio.cava.values[barCount - i - 1]));
+                    var targetRight = Math.max(0, Math.min(1, values[barCount - i - 1] || 0));
                     displayValues[barCount + i] += (targetRight - displayValues[barCount + i]) * smoothing;
 
                     var xRight = width * 0.6 + i * (width * 0.4 / barCount);
@@ -130,11 +143,21 @@ Item {
             }
 
             Timer {
-                interval: 16
-                running: true
+                interval: 50
+                running: canvasWrapper.shouldRender && (canvas.hasAudioEnergy || canvas.hasDisplayEnergy())
                 repeat: true
                 onTriggered: canvas.requestPaint()
             }
+
+            Connections {
+                target: Audio.cava
+                function onValuesChanged() {
+                    if (canvasWrapper.shouldRender)
+                        canvas.requestPaint();
+                }
+            }
+
+            onVisibleChanged: if (canvasWrapper.shouldRender) requestPaint()
         }
     }
 }

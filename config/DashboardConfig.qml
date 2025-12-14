@@ -4,6 +4,9 @@ JsonObject {
     property bool enabled: true
     property bool showOnHover: true
     property int mediaUpdateInterval: 500
+    property real mediaGifBpmDivisor: 300
+    // Multiplier applied to the BPM-based speed calculation
+    property real mediaGifSpeed: 1.0
     property int dragThreshold: 50
     property Sizes sizes: Sizes {}
 

@@ -17,21 +17,23 @@ Singleton {
     property string to: Config.services.nightLight.to
     property bool automatic: Config.services.nightLight.automatic
     property int colorTemperature: Config.services.nightLight.colorTemperature
-    property bool shouldBeOn
+    property bool shouldBeOn: false
     property bool firstEvaluation: true
     property bool active: false
+    readonly property int minutesPerDay: 24 * 60
 
-    property int fromHour: Number(from.split(":")[0])
-    property int fromMinute: Number(from.split(":")[1])
-    property int toHour: Number(to.split(":")[0])
-    property int toMinute: Number(to.split(":")[1])
+    property var parsedFrom: parseTime(from, 19, 0)
+    property var parsedTo: parseTime(to, 6, 30)
+    property int fromMinutes: parsedFrom.hour * 60 + parsedFrom.minute
+    property int toMinutes: parsedTo.hour * 60 + parsedTo.minute
 
     property int clockHour: Time.hours
     property int clockMinute: Time.minutes
+    property int nowMinutes: (clockHour * 60 + clockMinute) % minutesPerDay
 
     property var manualActive
-    property int manualActiveHour
-    property int manualActiveMinute
+    property int manualActiveHour: 0
+    property int manualActiveMinute: 0
 
     onClockMinuteChanged: reEvaluate()
     onAutomaticChanged: {
@@ -39,26 +41,70 @@ Singleton {
         root.firstEvaluation = true;
         reEvaluate();
     }
-
-    function inBetween(t, from, to) {
-        if (from < to) {
-            return (t >= from && t <= to);
-        } else {
-            // Wrapped around midnight
-            return (t >= from || t <= to);
-        }
+    onFromChanged: {
+        root.manualActive = undefined;
+        reEvaluate(true);
+    }
+    onToChanged: {
+        root.manualActive = undefined;
+        reEvaluate(true);
     }
 
-    function reEvaluate() {
-        const t = clockHour * 60 + clockMinute;
-        const from = fromHour * 60 + fromMinute;
-        const to = toHour * 60 + toMinute;
-        const manualActive = manualActiveHour * 60 + manualActiveMinute;
+    Component.onCompleted: reEvaluate(true);
 
-        if (root.manualActive !== undefined && (inBetween(from, manualActive, t) || inBetween(to, manualActive, t))) {
-            root.manualActive = undefined;
+    function parseTime(timeString, fallbackHour, fallbackMinute) {
+        if (typeof timeString !== "string")
+            return {hour: fallbackHour, minute: fallbackMinute};
+
+        const parts = timeString.split(":");
+        const hour = Number(parts[0]);
+        const minute = Number(parts[1]);
+
+        const validHour = Number.isFinite(hour) && hour >= 0 && hour < 24 ? hour : fallbackHour;
+        const validMinute = Number.isFinite(minute) && minute >= 0 && minute < 60 ? minute : fallbackMinute;
+        return {hour: validHour, minute: validMinute};
+    }
+
+    function inBetween(t, from, to) {
+        if (from < to)
+            return (t >= from && t <= to);
+
+        // Wrapped around midnight
+        return (t >= from || t <= to);
+    }
+
+    function minutesUntil(target, from) {
+        let delta = target - from;
+        if (delta < 0)
+            delta += minutesPerDay;
+        return delta;
+    }
+
+    function reEvaluate(forceEnsure = false) {
+        const t = nowMinutes;
+        const from = fromMinutes;
+        const to = toMinutes;
+        let clearedManualOverride = false;
+
+        if (root.manualActive !== undefined) {
+            const manualActiveTime = (manualActiveHour * 60 + manualActiveMinute) % minutesPerDay;
+            const manualTarget = inBetween(manualActiveTime, from, to) ? to : from;
+            const timeSinceManual = minutesUntil(t, manualActiveTime);
+            const timeUntilBoundary = minutesUntil(manualTarget, manualActiveTime);
+
+            if (timeSinceManual >= timeUntilBoundary) {
+                clearedManualOverride = true;
+                root.manualActive = undefined;
+            }
         }
-        root.shouldBeOn = inBetween(t, from, to);
+
+        const newShouldBeOn = inBetween(t, from, to);
+        if (newShouldBeOn !== root.shouldBeOn) {
+            root.shouldBeOn = newShouldBeOn;
+        } else if (forceEnsure || clearedManualOverride) {
+            root.ensureState();
+        }
+
         if (firstEvaluation) {
             firstEvaluation = false;
             root.ensureState();
@@ -113,16 +159,12 @@ Singleton {
 
     function toggle(active = undefined) {
         console.log("[Hyprsunset] Toggle called with active:", active, "current manualActive:", root.manualActive, "current active:", root.active);
-        
-        if (root.manualActive === undefined) {
-            root.manualActive = root.active;
-            root.manualActiveHour = root.clockHour;
-            root.manualActiveMinute = root.clockMinute;
-        }
 
-        root.manualActive = active !== undefined ? active : !root.manualActive;
+        root.manualActive = active !== undefined ? active : !root.active;
+        root.manualActiveHour = root.clockHour;
+        root.manualActiveMinute = root.clockMinute;
         console.log("[Hyprsunset] Setting manualActive to:", root.manualActive);
-        
+
         if (root.manualActive) {
             root.enable();
         } else {
