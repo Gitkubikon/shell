@@ -321,7 +321,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: Qt.rgba(0.06, 0.06, 0.07, 0.78) // lightweight scrim, no slow blur
+            color: Qt.rgba(0.05, 0.05, 0.06, 0.7)
 
             MouseArea {
                 anchors.fill: parent
@@ -337,10 +337,15 @@ Item {
             implicitWidth: width
             implicitHeight: height
             anchors.centerIn: parent
+            anchors.margins: Appearance.padding.normal
             radius: Appearance.rounding.large
-            color: Colours.tPalette.m3surfaceContainerHigh
-            border.color: Colours.tPalette.m3outlineVariant
+            color: Colours.layer(Colours.palette.m3surfaceContainerHigh, 1)
+            border.color: Colours.layer(Colours.palette.m3outlineVariant, 1)
             border.width: 1
+            clip: true
+            antialiasing: true
+            layer.enabled: true
+            layer.samples: 8
 
             ColumnLayout {
                 anchors.fill: parent
@@ -398,6 +403,7 @@ Item {
 
                 RowLayout {
                     Layout.fillWidth: true
+                    visible: Services.Calendar.loading || !Services.Calendar.khalAvailable
                     spacing: Appearance.spacing.smaller
 
                     BusyIndicator {
@@ -408,17 +414,17 @@ Item {
                     }
 
                     StyledText {
-                        visible: Services.Calendar.loading
                         text: qsTr("Refreshing events…")
                         color: Colours.palette.m3onSurfaceVariant
                         font.weight: 600
+                        visible: Services.Calendar.loading
                     }
 
                     StyledText {
-                        visible: !Services.Calendar.khalAvailable
                         text: Services.Calendar.errorMessage || qsTr("Calendar backend not available")
                         color: Colours.palette.m3error
                         font.weight: 600
+                        visible: !Services.Calendar.khalAvailable
                     }
 
                     Item { Layout.fillWidth: true }
@@ -499,6 +505,16 @@ Item {
                         implicitWidth: parent ? parent.width : implicitWidth
                         implicitHeight: inner.implicitHeight + Appearance.padding.normal * 2
 
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 4
+                            radius: 4
+                            color: modelData.color || Colours.palette.m3primary
+                            opacity: 0.9
+                        }
+
                         ColumnLayout {
                             id: inner
 
@@ -508,23 +524,24 @@ Item {
 
                             RowLayout {
                                 Layout.fillWidth: true
+                                spacing: 6
 
-                StyledText {
-                    text: {
-                        const d = modelData && modelData.startDate ? new Date(modelData.startDate) : null;
-                        return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "--:--";
-                    }
-                    font.weight: 600
-                    color: Colours.palette.m3primary
-                }
+                                StyledText {
+                                    text: {
+                                        const d = modelData && modelData.startDate ? new Date(modelData.startDate) : null;
+                                        return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "--:--";
+                                    }
+                                    font.weight: 600
+                                    color: Colours.palette.m3primary
+                                }
 
-                StyledText {
-                    text: {
-                        const d = modelData && modelData.endDate ? new Date(modelData.endDate) : null;
-                        return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "--:--";
-                    }
-                    color: Colours.palette.m3onSurfaceVariant
-                }
+                                StyledText {
+                                    text: {
+                                        const d = modelData && modelData.endDate ? new Date(modelData.endDate) : null;
+                                        return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "--:--";
+                                    }
+                                    color: Colours.palette.m3onSurfaceVariant
+                                }
 
                                 Item { Layout.fillWidth: true }
 
@@ -540,15 +557,15 @@ Item {
                                 Layout.fillWidth: true
                                 text: {
                                     if (modelData && modelData.title && modelData.title.length) return modelData.title;
-                            if (modelData && modelData.content && modelData.content.length) return modelData.content;
-                            if (modelData && modelData.summary && modelData.summary.length) return modelData.summary;
-                            if (modelData && modelData.startIso) return modelData.startIso;
-                            return qsTr("Untitled event");
-                        }
-                        wrapMode: Text.Wrap
-                        color: Colours.palette.m3onSurface
-                        font.weight: 500
-                    }
+                                    if (modelData && modelData.content && modelData.content.length) return modelData.content;
+                                    if (modelData && modelData.summary && modelData.summary.length) return modelData.summary;
+                                    if (modelData && modelData.startIso) return modelData.startIso;
+                                    return qsTr("Untitled event");
+                                }
+                                wrapMode: Text.Wrap
+                                color: Colours.palette.m3onSurface
+                                font.weight: 500
+                            }
                         }
                     }
                 }
