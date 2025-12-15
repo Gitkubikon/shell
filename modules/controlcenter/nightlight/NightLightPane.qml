@@ -73,36 +73,14 @@ Item {
                 }
             }
 
-            // Automatic Mode Toggle
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Appearance.spacing.normal
-
-                MaterialIcon {
-                    text: "schedule"
-                    color: Colours.palette.m3onSurface
-                    font.pointSize: Appearance.font.size.larger
-                }
-
-                StyledText {
-                    Layout.fillWidth: true
-                    text: qsTr("Automatic")
-                    font.pointSize: Appearance.font.size.normal
-                }
-
-                StyledSwitch {
-                    checked: Config.services.nightLight.automatic
-                    onToggled: Config.services.nightLight.automatic = checked
-                }
-            }
-
             StyledText {
-                Layout.topMargin: -Appearance.spacing.normal
+                Layout.topMargin: Appearance.spacing.normal
                 Layout.leftMargin: Appearance.font.size.larger + Appearance.spacing.normal
                 text: qsTr("Automatically enable between %1 and %2").arg(Config.services.nightLight.from).arg(Config.services.nightLight.to)
                 color: Colours.palette.m3outline
                 font.pointSize: Appearance.font.size.small
                 wrapMode: Text.WordWrap
+                visible: Config.services.nightLight.automatic
             }
 
             // Temperature Slider

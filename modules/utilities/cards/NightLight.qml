@@ -133,39 +133,9 @@ StyledRect {
             }
         }
 
-        RowLayout {
-            Layout.fillWidth: true
-            visible: Hyprsunset.active
-            spacing: Appearance.spacing.normal
-
-            opacity: Hyprsunset.active ? 1 : 0
-
-            Behavior on opacity {
-                Anim {}
-            }
-
-            MaterialIcon {
-                text: "schedule"
-                color: Colours.palette.m3onSurfaceVariant
-                font.pointSize: Appearance.font.size.normal
-            }
-
-            StyledText {
-                Layout.fillWidth: true
-                text: qsTr("Automatic mode")
-                font.pointSize: Appearance.font.size.small
-                color: Colours.palette.m3onSurfaceVariant
-            }
-
-            StyledSwitch {
-                checked: Config.services.nightLight.automatic
-                onToggled: Config.services.nightLight.automatic = checked
-            }
-        }
-
         StyledText {
             Layout.fillWidth: true
-            Layout.topMargin: -Appearance.spacing.small
+            Layout.topMargin: Appearance.spacing.small
             visible: Config.services.nightLight.automatic && Hyprsunset.active
             text: qsTr("Active from %1 to %2").arg(Config.services.nightLight.from).arg(Config.services.nightLight.to)
             color: Colours.palette.m3outline
