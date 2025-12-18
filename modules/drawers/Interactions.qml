@@ -2,6 +2,7 @@ import qs.components.controls
 import qs.config
 import qs.modules.bar.popouts as BarPopouts
 import Quickshell
+import Quickshell.Io
 import QtQuick
 
 CustomMouseArea {
@@ -17,6 +18,23 @@ CustomMouseArea {
     property bool dashboardShortcutActive
     property bool osdShortcutActive
     property bool utilitiesShortcutActive
+    property bool inHotCorner
+    property bool hotCornerCooldown: false
+
+    Timer {
+        id: hotCornerTimer
+        interval: 1000
+        repeat: false
+        onTriggered: root.hotCornerCooldown = false
+    }
+
+    IpcHandler {
+        target: "hotcorner"
+        function ignore() {
+            root.hotCornerCooldown = true;
+            hotCornerTimer.start();
+        }
+    }
 
     function withinPanelHeight(panel: Item, x: real, y: real): bool {
         const panelY = Config.border.thickness + panel.y;
@@ -84,6 +102,20 @@ CustomMouseArea {
 
         const x = event.x;
         const y = event.y;
+
+        if (x < 5 && y < 5) {
+            if (!root.inHotCorner) {
+                 if (!root.hotCornerCooldown) {
+                    root.hotCornerCooldown = true;
+                    hotCornerTimer.start();
+                    Quickshell.execDetached(["qs", "ipc", "-c", "overview", "call", "overview", "toggle"]);
+                 }
+                 root.inHotCorner = true;
+            }
+        } else {
+            root.inHotCorner = false;
+        }
+
         const dragX = x - dragStart.x;
         const dragY = y - dragStart.y;
 

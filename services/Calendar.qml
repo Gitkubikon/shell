@@ -20,6 +20,7 @@ Singleton {
     property bool loading: false
     property string errorMessage: ""
     property var events: []
+    property var eventsMap: ({})
 
     readonly property int refreshIntervalMs: Config.services?.calendarUpdateInterval ?? 300000
 
@@ -30,8 +31,9 @@ Singleton {
         if (!khalAvailable || !date)
             return [];
 
-        const target = new Date(date);
-        return events.filter(e => sameDay(e.startDate, target));
+        const d = new Date(date);
+        const key = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+        return eventsMap[key] || [];
     }
 
     /**
@@ -152,6 +154,17 @@ Singleton {
                 } else {
                     console.log("[Calendar] Parsed events count: 0", "skipped invalid:", skipped);
                 }
+
+                // Build lookup map
+                const newMap = {};
+                for (const evt of root.events) {
+                    const d = evt.startDate;
+                    const key = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+                    if (!newMap[key]) newMap[key] = [];
+                    newMap[key].push(evt);
+                }
+                root.eventsMap = newMap;
+
                 root.errorMessage = "";
                 root.khalAvailable = true;
             } catch (e) {

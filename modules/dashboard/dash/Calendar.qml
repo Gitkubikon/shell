@@ -27,8 +27,7 @@ Item {
                                       : new Date()
     readonly property var calendarLayout: buildCalendar(viewDate, isCurrentMonth(viewDate), firstDay)
     readonly property var selectedEvents: Services.Calendar.eventsOn(state?.currentDate ?? new Date())
-                                              .filter(e => e && e.startDate && !isNaN(new Date(e.startDate)))
-                                              .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+                                              .sort((a, b) => a.startDate - b.startDate)
     property bool overlayVisible: false
     property date overlayDate: state?.currentDate ?? new Date()
     property var overlayEvents: []
@@ -139,7 +138,6 @@ Item {
         overlayEvents = [];
         overlayDate = new Date(targetDate);
         overlayEvents = Services.Calendar.eventsOn(targetDate)
-                                .filter(e => e && e.startDate && !isNaN(new Date(e.startDate)))
                                 .map(e => ({
                                     title: e.title,
                                     content: e.content,
@@ -150,7 +148,7 @@ Item {
                                     endIso: e.endIso,
                                     color: e.color
                                 }))
-                                .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+                                .sort((a, b) => a.startDate - b.startDate);
         overlayVisible = true;
     }
 
@@ -394,8 +392,7 @@ Item {
                         icon: "close"
                         padding: Appearance.padding.smaller
                         font.pointSize: Appearance.font.size.normal
-                        implicitHeight: Math.max(34, implicitHeight)
-                        implicitWidth: implicitHeight
+                        implicitHeight: Math.max(34, label.implicitHeight + padding * 2)
 
                         onClicked: overlayVisible = false
                     }
@@ -609,7 +606,6 @@ Item {
         readonly property var events: safeCell.day === ""
                                       ? []
                                       : Services.Calendar.eventsOn(toDate(safeCell))
-                                            .filter(e => e && e.startDate && !isNaN(new Date(e.startDate)))
         readonly property color eventColor: dayCell.events.length > 0
                                             ? (dayCell.events[0]?.color || Colours.palette.m3primary)
                                             : Colours.palette.m3primary
