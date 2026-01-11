@@ -46,13 +46,8 @@ Item {
         }
 
         Tab {
-<<<<<<< HEAD
             iconName: "smart_toy"
             text: qsTr("AI Chat")
-=======
-            iconName: "cloud"
-            text: qsTr("Weather")
->>>>>>> upstream/main
         }
 
         // Tab {

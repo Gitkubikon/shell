@@ -70,12 +70,9 @@ Item {
         CachingImage {
             path: root.modelData.previewPath || root.modelData.path
             smooth: !root.PathView.view.moving
-<<<<<<< HEAD
             preferAnimated: root.animatePreview
             playbackEnabled: root.animatePreview
-=======
             cache: true
->>>>>>> upstream/main
 
             anchors.fill: parent
         }

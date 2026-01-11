@@ -105,11 +105,7 @@ Item {
                 }
 
                 Pane {
-<<<<<<< HEAD
                     sourceComponent: AiChat {}
-=======
-                    sourceComponent: Weather {}
->>>>>>> upstream/main
                 }
             }
 

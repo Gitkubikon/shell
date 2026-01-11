@@ -92,14 +92,11 @@ StyledRect {
                 onClicked: VPN.toggle()
             }
 
-<<<<<<< HEAD
             Toggle {
                 icon: Config.services.nightLight.automatic ? "schedule" : "bedtime"
                 checked: Hyprsunset.active
                 onClicked: Hyprsunset.toggle()
             }
-=======
->>>>>>> upstream/main
         }
     }
 
