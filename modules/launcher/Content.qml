@@ -87,10 +87,10 @@ Item {
                     if (list.showWallpapers) {
                         if (Colours.scheme === "dynamic" && currentItem.modelData.path !== Wallpapers.actualCurrent)
                             Wallpapers.previewColourLock = true;
-                        Wallpapers.setWallpaper(currentItem.modelData.path);
+                        Wallpapers.setWallpaper(currentItem.modelData.path, currentItem.modelData.previewPath);
                         root.visibilities.launcher = false;
                     } else if (text.startsWith(Config.launcher.actionPrefix)) {
-                        if (text.startsWith(`${Config.launcher.actionPrefix}calc `))
+                        if (text.startsWith(`${Config.launcher.actionPrefix}calc `) || text.startsWith(`${Config.launcher.actionPrefix}passgen`))
                             currentItem.onClicked();
                         else
                             currentItem.modelData.onClicked(list.currentList);

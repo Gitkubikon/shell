@@ -224,7 +224,30 @@ Singleton {
             return "checklist";
         if (name === "sysmon")
             return "monitor_heart";
+        
+        // Check if the name is a number and convert to Roman numerals
+        const num = parseInt(name);
+        if (!isNaN(num) && num > 0) {
+            return toRoman(num);
+        }
+        
         return name[0].toUpperCase();
+    }
+
+    function toRoman(num: int): string {
+        const romanNumerals = [
+            [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+            [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+            [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+        ];
+        let result = '';
+        for (let i = 0; i < romanNumerals.length; i++) {
+            while (num >= romanNumerals[i][0]) {
+                result += romanNumerals[i][1];
+                num -= romanNumerals[i][0];
+            }
+        }
+        return result;
     }
 
     function getTrayIcon(id: string, icon: string): string {

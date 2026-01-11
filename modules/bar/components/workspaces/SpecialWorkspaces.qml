@@ -88,7 +88,7 @@ Item {
         id: view
 
         anchors.fill: parent
-        spacing: Appearance.spacing.normal
+        spacing: Appearance.spacing.small  // Reduced from normal for compactness
         interactive: false
 
         currentIndex: model.values.findIndex(w => w.name === root.activeSpecial)
@@ -98,11 +98,12 @@ Item {
             values: Hypr.workspaces.values.filter(w => w.name.startsWith("special:") && (!Config.bar.workspaces.perMonitorWorkspaces || w.monitor === root.monitor))
         }
 
-        preferredHighlightBegin: 0
-        preferredHighlightEnd: height
-        highlightRangeMode: ListView.StrictlyEnforceRange
+        // Fixed: Changed to ApplyRange to prevent jumping to bottom
+        preferredHighlightBegin: height * 0.3  // Keep in view but not centered
+        preferredHighlightEnd: height * 0.7
+        highlightRangeMode: ListView.ApplyRange
 
-        highlightFollowsCurrentItem: false
+        highlightFollowsCurrentItem: true  // Changed to true for smoother behavior
         highlight: Item {
             y: view.currentItem?.y ?? 0
             implicitHeight: view.currentItem?.size ?? 0
@@ -165,10 +166,11 @@ Item {
                 id: label
 
                 Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
-                Layout.preferredHeight: Config.bar.sizes.innerWidth - Appearance.padding.small * 2
+                Layout.preferredHeight: Config.bar.sizes.innerWidth - Appearance.padding.normal * 2  // Slightly smaller for compactness
 
                 asynchronous: true
-                sourceComponent: ws.icon.length === 1 ? letterComp : iconComp
+                // Check if icon contains only Roman numeral characters (I, V, X, L, C, D, M)
+                sourceComponent: /^[IVXLCDM]+$/.test(ws.icon) || ws.icon.length === 1 ? letterComp : iconComp
 
                 Component {
                     id: iconComp
@@ -184,8 +186,13 @@ Item {
                     id: letterComp
 
                     StyledText {
+                        font.pointSize: Appearance.font.size.smaller * 0.85
                         text: ws.icon
+                        color: Colours.palette.m3onSurface
                         verticalAlignment: Qt.AlignVCenter
+                        horizontalAlignment: Qt.AlignHCenter
+                        elide: Text.ElideNone
+                        wrapMode: Text.NoWrap
                     }
                 }
             }

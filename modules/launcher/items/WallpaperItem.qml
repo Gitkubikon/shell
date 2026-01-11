@@ -32,7 +32,7 @@ Item {
         radius: Appearance.rounding.normal
 
         function onClicked(): void {
-            Wallpapers.setWallpaper(root.modelData.path);
+            Wallpapers.setWallpaper(root.modelData.path, root.modelData.previewPath);
             root.visibilities.launcher = false;
         }
     }
@@ -68,7 +68,7 @@ Item {
         }
 
         CachingImage {
-            path: root.modelData.path
+            path: root.modelData.previewPath || root.modelData.path
             smooth: !root.PathView.view.moving
             preferAnimated: root.animatePreview
             playbackEnabled: root.animatePreview

@@ -10,6 +10,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
+import QtQuick.Effects
 import "calendar_layout.js" as CalendarLayout
 
 Item {
@@ -121,323 +122,336 @@ Item {
         return new Date(cell.year, cell.month, cell.day);
     }
 
-    function openEventsOverlay(cellItem) {
-        const targetCell = cellItem && cellItem.safeCell ? cellItem.safeCell : null;
-        const targetDate = targetCell ? toDate(targetCell) : state?.currentDate ?? new Date();
+        function openEventsOverlay(cellItem) {
+            const targetCell = cellItem && cellItem.safeCell ? cellItem.safeCell : null;
+            const targetDate = targetCell ? toDate(targetCell) : state?.currentDate ?? new Date();
 
-        if (!state?.currentDate) {
-            state.currentDate = targetDate;
+            if (!state?.currentDate) {
+                state.currentDate = targetDate;
+            }
+
+            if (targetCell && targetCell.day !== "") {
+                state.currentDate = targetDate;
+            }
+
+            // Reset and repopulate overlay data to avoid stale/mingled entries
+            overlayVisible = false;
+            overlayEvents = [];
+            overlayDate = new Date(targetDate);
+            overlayEvents = Services.Calendar.eventsOn(targetDate)
+                                    .map(e => ({
+                                        title: e.title,
+                                        content: e.content,
+                                        summary: e.summary,
+                                        startDate: e.startDate,
+                                        endDate: e.endDate,
+                                        startIso: e.startIso,
+                                        endIso: e.endIso,
+                                        color: e.color
+                                    }))
+                                    .sort((a, b) => a.startDate - b.startDate);
+            overlayVisible = true;
         }
 
-        if (targetCell && targetCell.day !== "") {
-            state.currentDate = targetDate;
-        }
-
-        // Reset and repopulate overlay data to avoid stale/mingled entries
-        overlayVisible = false;
-        overlayEvents = [];
-        overlayDate = new Date(targetDate);
-        overlayEvents = Services.Calendar.eventsOn(targetDate)
-                                .map(e => ({
-                                    title: e.title,
-                                    content: e.content,
-                                    summary: e.summary,
-                                    startDate: e.startDate,
-                                    endDate: e.endDate,
-                                    startIso: e.startIso,
-                                    endIso: e.endIso,
-                                    color: e.color
-                                }))
-                                .sort((a, b) => a.startDate - b.startDate);
-        overlayVisible = true;
-    }
-
-    Item {
-        id: calendarBody
-
-        anchors.fill: parent
-
-        ColumnLayout {
-            id: content
+        Item {
+            id: calendarBody
 
             anchors.fill: parent
-            anchors.margins: Appearance.padding.large
-            spacing: Appearance.spacing.normal
-
-        RowLayout {
-            id: monthRow
-            Layout.fillWidth: true
-
-            spacing: Appearance.spacing.small
-
-            Item {
-                implicitWidth: implicitHeight
-                implicitHeight: prevMonthIcon.implicitHeight + Appearance.padding.small * 2
-
-                StateLayer {
-                    id: prevMonthState
-
-                    radius: Appearance.rounding.full
-                    function onClicked() {
-                        root.state.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
-                    }
-                }
-
-                MaterialIcon {
-                    id: prevMonthIcon
-
-                    anchors.centerIn: parent
-                    text: "chevron_left"
-                    color: Colours.palette.m3tertiary
-                    font.pointSize: Appearance.font.size.normal
-                    font.weight: 700
-                }
-            }
-
-            StyledText {
-                Layout.fillWidth: true
-
-                text: Qt.formatDate(viewDate, "MMMM yyyy")
-                horizontalAlignment: Text.AlignHCenter
-                color: Colours.palette.m3primary
-                font.pointSize: Appearance.font.size.normal
-                font.weight: 600
-
-                StateLayer {
-                    anchors.fill: parent
-                    anchors.margins: -Appearance.padding.small
-                    radius: Appearance.rounding.full
-                    disabled: isCurrentMonth(viewDate)
-
-                    function onClicked() {
-                        root.state.currentDate = new Date();
-                    }
-                }
-            }
-
-            Item {
-                implicitWidth: implicitHeight
-                implicitHeight: nextMonthIcon.implicitHeight + Appearance.padding.small * 2
-
-                StateLayer {
-                    id: nextMonthState
-
-                    radius: Appearance.rounding.full
-                    function onClicked() {
-                        root.state.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
-                    }
-                }
-
-                MaterialIcon {
-                    id: nextMonthIcon
-
-                    anchors.centerIn: parent
-                    text: "chevron_right"
-                    color: Colours.palette.m3tertiary
-                    font.pointSize: Appearance.font.size.normal
-                    font.weight: 700
-                }
-            }
-        }
-
-        RowLayout {
-            id: weekdayRow
-            Layout.fillWidth: true
-            spacing: root.gridSpacing
-
-            Repeater {
-                model: (CalendarLayout && CalendarLayout.getWeekDays)
-                           ? CalendarLayout.getWeekDays(firstDay)
-                           : [
-                               { day: "Mo", today: 0 },
-                               { day: "Tu", today: 0 },
-                               { day: "We", today: 0 },
-                               { day: "Th", today: 0 },
-                               { day: "Fr", today: 0 },
-                               { day: "Sa", today: 0 },
-                               { day: "Su", today: 0 },
-                           ]
-
-                delegate: StyledText {
-                    required property var modelData
-
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: root.cellSize
-                    Layout.alignment: Qt.AlignHCenter
-                    text: modelData.day
-                    horizontalAlignment: Text.AlignHCenter
-                    font.weight: 600
-                    color: Colours.palette.m3onSurfaceVariant
-                }
-            }
-        }
-
-        ColumnLayout {
-            id: gridWrapper
-
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: root.gridSpacing
-            Layout.preferredHeight: root.cellSize * root.gridRows + root.gridSpacing * (root.gridRows - 1)
-
-            Repeater {
-                model: calendarLayout || []
-
-                delegate: RowLayout {
-                    required property var modelData
-
-                    readonly property var week: modelData
-
-                    Layout.fillWidth: true
-                    spacing: root.gridSpacing
-                    Layout.preferredHeight: root.cellSize
-
-                    Repeater {
-                        model: week ? week.length : 0
-
-                        delegate: DayCell {
-                            required property int index
-
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: root.cellSize
-                            Layout.alignment: Qt.AlignHCenter
-
-                            cell: week ? week[index] : null
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Item {
-        id: overlayLayer
-
-        anchors.fill: parent
-        visible: overlayVisible
-        z: 9999
-
-        Rectangle {
-            anchors.fill: parent
-            color: Qt.rgba(0.05, 0.05, 0.06, 0.7)
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: overlayVisible = false
-            }
-        }
-
-        StyledRect {
-            id: overlayCard
-
-            width: Math.max(360, Math.min(root.width * 0.92, 700))
-            height: Math.max(320, Math.min(root.height * 0.98, 560))
-            implicitWidth: width
-            implicitHeight: height
-            anchors.centerIn: parent
-            anchors.margins: Appearance.padding.normal
-            radius: Appearance.rounding.large
-            color: Colours.layer(Colours.palette.m3surfaceContainerHigh, 1)
-            border.color: Colours.layer(Colours.palette.m3outlineVariant, 1)
-            border.width: 1
-            clip: true
-            antialiasing: true
-            layer.enabled: true
-            layer.samples: 8
 
             ColumnLayout {
+                id: content
+
                 anchors.fill: parent
-                anchors.margins: Appearance.padding.normal
+                anchors.margins: Appearance.padding.large
                 spacing: Appearance.spacing.normal
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Appearance.spacing.smaller
+            RowLayout {
+                id: monthRow
+                Layout.fillWidth: true
+
+                spacing: Appearance.spacing.small
+
+                Item {
+                    implicitWidth: implicitHeight
+                    implicitHeight: prevMonthIcon.implicitHeight + Appearance.padding.small * 2
+
+                    StateLayer {
+                        id: prevMonthState
+
+                        radius: Appearance.rounding.full
+                        function onClicked() {
+                            root.state.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+                        }
+                    }
 
                     MaterialIcon {
-                        text: "event_note"
-                        color: Colours.palette.m3primary
+                        id: prevMonthIcon
+
+                        anchors.centerIn: parent
+                        text: "chevron_left"
+                        color: Colours.palette.m3tertiary
                         font.pointSize: Appearance.font.size.normal
                         font.weight: 700
                     }
+                }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 2
+                StyledText {
+                    Layout.fillWidth: true
 
-                        StyledText {
-                            Layout.fillWidth: true
-                            text: Qt.formatDate(overlayDate ?? new Date(), "dddd, dd MMM yyyy")
-                            font.weight: 700
-                            color: Colours.palette.m3onSurface
-                            wrapMode: Text.Wrap
+                    text: Qt.formatDate(viewDate, "MMMM yyyy")
+                    horizontalAlignment: Text.AlignHCenter
+                    color: Colours.palette.m3primary
+                    font.pointSize: Appearance.font.size.normal
+                    font.weight: 600
+
+                    StateLayer {
+                        anchors.fill: parent
+                        anchors.margins: -Appearance.padding.small
+                        radius: Appearance.rounding.full
+                        disabled: isCurrentMonth(viewDate)
+
+                        function onClicked() {
+                            root.state.currentDate = new Date();
                         }
+                    }
+                }
 
-                        StyledText {
-                            Layout.fillWidth: true
-                            text: {
-                                const count = overlayEvents.length;
-                                return count === 1 ? qsTr("1 event") : qsTr("%1 events").arg(count);
-                            }
-                            color: Colours.palette.m3onSurfaceVariant
+                Item {
+                    implicitWidth: implicitHeight
+                    implicitHeight: nextMonthIcon.implicitHeight + Appearance.padding.small * 2
+
+                    StateLayer {
+                        id: nextMonthState
+
+                        radius: Appearance.rounding.full
+                        function onClicked() {
+                            root.state.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
                         }
                     }
 
-                    Item { Layout.fillWidth: true }
+                    MaterialIcon {
+                        id: nextMonthIcon
 
-                    IconButton {
-                        id: closeButton
-
-                        type: IconButton.Tonal
-                        icon: "close"
-                        padding: Appearance.padding.smaller
+                        anchors.centerIn: parent
+                        text: "chevron_right"
+                        color: Colours.palette.m3tertiary
                         font.pointSize: Appearance.font.size.normal
-                        implicitHeight: Math.max(34, label.implicitHeight + padding * 2)
-
-                        onClicked: overlayVisible = false
+                        font.weight: 700
                     }
                 }
+            }
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    visible: Services.Calendar.loading || !Services.Calendar.khalAvailable
-                    spacing: Appearance.spacing.smaller
+            RowLayout {
+                id: weekdayRow
+                Layout.fillWidth: true
+                spacing: root.gridSpacing
 
-                    BusyIndicator {
-                        visible: Services.Calendar.loading
-                        running: visible
-                        width: 18
-                        height: 18
-                    }
+                Repeater {
+                    model: (CalendarLayout && CalendarLayout.getWeekDays)
+                               ? CalendarLayout.getWeekDays(firstDay)
+                               : [
+                                   { day: "Mo", today: 0 },
+                                   { day: "Tu", today: 0 },
+                                   { day: "We", today: 0 },
+                                   { day: "Th", today: 0 },
+                                   { day: "Fr", today: 0 },
+                                   { day: "Sa", today: 0 },
+                                   { day: "Su", today: 0 },
+                               ]
 
-                    StyledText {
-                        text: qsTr("Refreshing events…")
+                    delegate: StyledText {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: root.cellSize
+                        Layout.alignment: Qt.AlignHCenter
+                        text: modelData.day
+                        horizontalAlignment: Text.AlignHCenter
+                        font.weight: 600
                         color: Colours.palette.m3onSurfaceVariant
-                        font.weight: 600
-                        visible: Services.Calendar.loading
                     }
-
-                    StyledText {
-                        text: Services.Calendar.errorMessage || qsTr("Calendar backend not available")
-                        color: Colours.palette.m3error
-                        font.weight: 600
-                        visible: !Services.Calendar.khalAvailable
-                    }
-
-                    Item { Layout.fillWidth: true }
                 }
+            }
 
-                Loader {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    sourceComponent: !Services.Calendar.khalAvailable
-                                       ? backendErrorComponent
-                                       : (overlayEvents.length === 0 ? overlayEmptyComponent : overlayEventsListComponent)
+            ColumnLayout {
+                id: gridWrapper
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: root.gridSpacing
+                Layout.preferredHeight: root.cellSize * root.gridRows + root.gridSpacing * (root.gridRows - 1)
+
+                Repeater {
+                    model: calendarLayout || []
+
+                    delegate: RowLayout {
+                        required property var modelData
+
+                        readonly property var week: modelData
+
+                        Layout.fillWidth: true
+                        spacing: root.gridSpacing
+                        Layout.preferredHeight: root.cellSize
+
+                        Repeater {
+                            model: week ? week.length : 0
+
+                            delegate: DayCell {
+                                required property int index
+
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: root.cellSize
+                                Layout.alignment: Qt.AlignHCenter
+
+                                cell: week ? week[index] : null
+                            }
+                        }
+                    }
                 }
             }
         }
-    }
 
+        Item {
+            id: overlayLayer
+
+            anchors.fill: parent
+            visible: overlayVisible
+            z: 9999
+
+            StyledRect {
+                id: overlayCard
+
+                anchors.fill: parent
+                radius: Appearance.rounding.large
+                color: "transparent"
+
+                ShaderEffectSource {
+                    id: blurSource
+                    sourceItem: calendarBody
+                    visible: false
+                    live: overlayVisible
+                }
+
+                // Blurred Background
+                Item {
+                    anchors.fill: parent
+                    layer.enabled: true
+                    layer.effect: OpacityMask {
+                        maskSource: Rectangle {
+                            width: overlayCard.width
+                            height: overlayCard.height
+                            radius: overlayCard.radius
+                            visible: false
+                        }
+                    }
+
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: blurSource
+                        blurEnabled: true
+                        blur: 64
+                        saturation: -0.1
+                    }
+
+                    // High opacity tint to hide sharp text
+                    Rectangle {
+                        anchors.fill: parent
+                        color: Colours.palette.m3surfaceContainerHigh
+                        opacity: 0.95
+                    }
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: Appearance.padding.normal
+                    spacing: Appearance.spacing.normal
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Appearance.spacing.smaller
+
+                        MaterialIcon {
+                            text: "event_note"
+                            color: Colours.palette.m3primary
+                            font.pointSize: Appearance.font.size.normal
+                            font.weight: 700
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            StyledText {
+                                Layout.fillWidth: true
+                                text: Qt.formatDate(overlayDate ?? new Date(), "dddd, dd MMM yyyy")
+                                font.weight: 700
+                                color: Colours.palette.m3onSurface
+                                wrapMode: Text.Wrap
+                            }
+
+                            StyledText {
+                                Layout.fillWidth: true
+                                text: {
+                                    const count = overlayEvents.length;
+                                    return count === 1 ? qsTr("1 event") : qsTr("%1 events").arg(count);
+                                }
+                                color: Colours.palette.m3onSurfaceVariant
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        IconButton {
+                            id: closeButton
+                            type: IconButton.Tonal
+                            icon: "close"
+                            padding: Appearance.padding.smaller
+                            font.pointSize: Appearance.font.size.normal
+                            implicitHeight: Math.max(34, label.implicitHeight + padding * 2)
+                            onClicked: overlayVisible = false
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: Services.Calendar.loading || !Services.Calendar.khalAvailable
+                        spacing: Appearance.spacing.smaller
+
+                        BusyIndicator {
+                            visible: Services.Calendar.loading
+                            running: visible
+                            width: 18
+                            height: 18
+                        }
+
+                        StyledText {
+                            text: qsTr("Refreshing events…")
+                            color: Colours.palette.m3onSurfaceVariant
+                            font.weight: 600
+                            visible: Services.Calendar.loading
+                        }
+
+                        StyledText {
+                            text: Services.Calendar.errorMessage || qsTr("Calendar backend not available")
+                            color: Colours.palette.m3error
+                            font.weight: 600
+                            visible: !Services.Calendar.khalAvailable
+                        }
+
+                        Item { Layout.fillWidth: true }
+                    }
+
+                    Loader {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        sourceComponent: !Services.Calendar.khalAvailable
+                                           ? backendErrorComponent
+                                           : (overlayEvents.length === 0 ? overlayEmptyComponent : overlayEventsListComponent)
+                    }
+                }
+            }
+        }
     Component {
         id: backendErrorComponent
 
@@ -472,104 +486,107 @@ Item {
         }
     }
 
-    Component {
-        id: overlayEventsListComponent
+        Component {
+            id: overlayEventsListComponent
 
-        ScrollView {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-            ColumnLayout {
-                id: eventsColumn
+                ColumnLayout {
+                    id: eventsColumn
 
-                width: parent.width - Appearance.padding.normal
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Appearance.spacing.smaller
+                    width: parent.width - Appearance.padding.normal
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: Appearance.spacing.small
 
-                Repeater {
-                    model: overlayEvents ? overlayEvents.slice(0) : []
+                    Repeater {
+                        model: overlayEvents ? overlayEvents.slice(0) : []
 
-                    delegate: StyledRect {
-                        required property var modelData
+                        delegate: StyledRect {
+                            required property var modelData
 
-                        Layout.fillWidth: true
-                        radius: Appearance.rounding.small
-                        color: Colours.layer(Colours.tPalette.m3surfaceContainerHigh, 1)
-                        border.color: modelData.color || Colours.palette.m3primary
-                        border.width: 1
-                        implicitWidth: parent ? parent.width : implicitWidth
-                        implicitHeight: inner.implicitHeight + Appearance.padding.normal * 2
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            anchors.bottom: parent.bottom
-                            width: 4
-                            radius: 4
-                            color: modelData.color || Colours.palette.m3primary
-                            opacity: 0.9
-                        }
-
-                        ColumnLayout {
-                            id: inner
-
-                            anchors.fill: parent
-                            anchors.margins: Appearance.padding.normal
-                            spacing: 2
+                            Layout.fillWidth: true
+                            implicitHeight: innerRow.implicitHeight + Appearance.padding.small * 2
+                            radius: Appearance.rounding.small
+                            color: Colours.palette.m3surfaceContainerHighest
 
                             RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 6
+                                id: innerRow
+                                anchors.fill: parent
+                                anchors.margins: Appearance.padding.small
+                                spacing: Appearance.spacing.small
 
-                                StyledText {
-                                    text: {
-                                        const d = modelData && modelData.startDate ? new Date(modelData.startDate) : null;
-                                        return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "--:--";
-                                    }
-                                    font.weight: 600
-                                    color: Colours.palette.m3primary
-                                }
-
-                                StyledText {
-                                    text: {
-                                        const d = modelData && modelData.endDate ? new Date(modelData.endDate) : null;
-                                        return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "--:--";
-                                    }
-                                    color: Colours.palette.m3onSurfaceVariant
-                                }
-
-                                Item { Layout.fillWidth: true }
-
+                                // Color Indicator Strip
                                 Rectangle {
-                                    width: 10
-                                    height: 10
-                                    radius: 5
+                                    Layout.fillHeight: true
+                                    Layout.preferredWidth: 4
+                                    radius: 2
                                     color: modelData.color || Colours.palette.m3primary
+                                    opacity: 0.9
                                 }
-                            }
 
-                            StyledText {
-                                Layout.fillWidth: true
-                                text: {
-                                    if (modelData && modelData.title && modelData.title.length) return modelData.title;
-                                    if (modelData && modelData.content && modelData.content.length) return modelData.content;
-                                    if (modelData && modelData.summary && modelData.summary.length) return modelData.summary;
-                                    if (modelData && modelData.startIso) return modelData.startIso;
-                                    return qsTr("Untitled event");
+                                // Content Column
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 0
+
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        text: {
+                                            if (modelData && modelData.title && modelData.title.length) return modelData.title;
+                                            if (modelData && modelData.summary && modelData.summary.length) return modelData.summary;
+                                            return qsTr("Untitled event");
+                                        }
+                                        wrapMode: Text.Wrap
+                                        color: Colours.palette.m3onSurface
+                                        font.weight: 600
+                                        font.pointSize: Appearance.font.size.normal
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        StyledText {
+                                            text: {
+                                                const d = modelData && modelData.startDate ? new Date(modelData.startDate) : null;
+                                                return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
+                                            }
+                                            font.weight: 500
+                                            font.pointSize: Appearance.font.size.smaller
+                                            color: Colours.palette.m3onSurfaceVariant
+                                        }
+
+                                        StyledText {
+                                            text: "-"
+                                            visible: timeEnd.visible
+                                            font.pointSize: Appearance.font.size.smaller
+                                            color: Colours.palette.m3onSurfaceVariant
+                                        }
+
+                                        StyledText {
+                                            id: timeEnd
+                                            text: {
+                                                const d = modelData && modelData.endDate ? new Date(modelData.endDate) : null;
+                                                return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
+                                            }
+                                            font.pointSize: Appearance.font.size.smaller
+                                            color: Colours.palette.m3onSurfaceVariant
+                                            visible: modelData.endDate && modelData.startDate && modelData.endDate !== modelData.startDate
+                                        }
+
+                                        Item { Layout.fillWidth: true }
+                                    }
                                 }
-                                wrapMode: Text.Wrap
-                                color: Colours.palette.m3onSurface
-                                font.weight: 500
                             }
                         }
                     }
                 }
             }
         }
-    }
-
     component DayCell: Item {
         id: dayCell
 
@@ -611,85 +628,87 @@ Item {
                                             : Colours.palette.m3primary
         readonly property bool isPast: dayCell.temporalState < 0
 
-        implicitWidth: root.cellSize
-        implicitHeight: root.cellSize
+                implicitWidth: root.cellSize
+                implicitHeight: root.cellSize
 
-        StyledRect {
-            anchors.fill: parent
-            radius: Math.min(root.cellSize * 0.28, Appearance.rounding.large)
-            color: dayCell.isSelected
-                       ? Colours.palette.m3primaryContainer
-                       : (dayCell.isToday
-                              ? Colours.layer(Colours.tPalette.m3surfaceContainerHigh, 1)
-                              : Colours.layer(Colours.tPalette.m3surfaceContainerLow, 1))
-            border.color: dayCell.isSelected
-                              ? Colours.palette.m3primary
-                              : (dayCell.isToday ? Colours.palette.m3primary : Colours.tPalette.m3outlineVariant)
-            border.width: dayCell.isToday || dayCell.isSelected ? 1 : 0
-            opacity: (!dayCell.isSelected && !dayCell.isToday && dayCell.isPast) ? 0.68 : 1
+                StyledRect {
+                    id: bg
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    radius: Appearance.rounding.small
 
-            Item {
-                anchors.fill: parent
-                anchors.margins: Appearance.padding.small
-
-                // Use plain Text with strong fallback color to avoid theme issues hiding numbers.
-                Text {
-                    anchors.centerIn: parent
-                    text: `${safeCell.day}`
-                    font.weight: dayCell.isSelected ? Font.DemiBold : Font.Medium
                     color: dayCell.isSelected
-                           ? Colours.palette.m3onPrimaryContainer
-                           : (dayCell.isToday
-                                  ? Colours.palette.m3primary
-                                  : (dayCell.inMonth
-                                         ? (dayCell.temporalState < 0
-                                                ? Colours.palette.m3onSurfaceVariant
-                                                : Colours.palette.m3onSurface)
-                                         : Colours.palette.m3onSurfaceVariant))
-                    font.pixelSize: Appearance.font.size.normal
-                }
-            }
+                               ? Colours.palette.m3primaryContainer
+                               : (dayCell.isToday
+                                      ? Colours.layer(Colours.palette.m3secondaryContainer, 0.3)
+                                      : "transparent")
 
-            RowLayout {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                anchors.leftMargin: Appearance.padding.small
-                anchors.rightMargin: Appearance.padding.small
-                anchors.bottomMargin: Appearance.padding.small
-                spacing: 2
-                visible: dayCell.events.length > 0
-                Layout.fillWidth: true
+                    border.width: (dayCell.isToday && !dayCell.isSelected) ? 1 : 0
+                    border.color: Colours.palette.m3primary
 
-                property int maxSegments: 3
-                property int segmentCount: Math.min(maxSegments, Math.max(1, dayCell.events.length))
+                    opacity: (!dayCell.isSelected && !dayCell.isToday && dayCell.isPast) ? 0.5 : 1
 
-                Repeater {
-                    model: parent.segmentCount
+                    Item {
+                        anchors.fill: parent
+                        anchors.margins: Appearance.padding.small
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: `${safeCell.day}`
+                            font.weight: (dayCell.isSelected || dayCell.isToday) ? Font.Bold : Font.Normal
+                            color: dayCell.isSelected
+                                   ? Colours.palette.m3onPrimaryContainer
+                                   : (dayCell.isToday
+                                          ? Colours.palette.m3primary
+                                          : (dayCell.inMonth
+                                                 ? Colours.palette.m3onSurface
+                                                 : Colours.palette.m3onSurfaceVariant))
+                            font.pointSize: Appearance.font.size.normal
+                        }
+                    }
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 4
+                        spacing: 3
+                        visible: dayCell.events.length > 0
+
+                        property int maxDots: 4
+                        property int dotCount: Math.min(maxDots, dayCell.events.length)
+
+                        Repeater {
+                            model: parent.dotCount
+                            Rectangle {
+                                width: 4
+                                height: 4
+                                radius: 2
+                                color: dayCell.isSelected
+                                       ? Colours.palette.m3onPrimaryContainer
+                                       : (dayCell.events[index]?.color || Colours.palette.m3primary)
+                            }
+                        }
+                    }
+
+                    HoverHandler {
+                        id: hover
+                        cursorShape: Qt.PointingHandCursor
+                    }
 
                     Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: parent.width / parent.segmentCount
-                        height: 4
-                        radius: 2
-                        color: dayCell.eventColor
-                        opacity: dayCell.isSelected ? 1 : (dayCell.inMonth ? 0.75 : 0.55)
+                        anchors.fill: parent
+                        radius: parent.radius
+                        color: Colours.palette.m3onSurface
+                        opacity: hover.hovered ? 0.05 : 0
                     }
-                }
-            }
 
-            HoverHandler {
-                id: hover
-            }
-
-            TapHandler {
-                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-                onTapped: {
-                    const dt = toDate(safeCell);
-                    openEventsOverlay(dayCell);
-                }
-            }
-        }
-    }
+                    TapHandler {
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                        onTapped: {
+                            const dt = toDate(safeCell);
+                            openEventsOverlay(dayCell);
+                        }
+                    }
+                }    }
 }
 }

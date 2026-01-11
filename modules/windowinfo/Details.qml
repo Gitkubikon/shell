@@ -1,5 +1,6 @@
 import qs.components
 import qs.services
+import qs.utils
 import qs.config
 import Quickshell.Hyprland
 import QtQuick
@@ -60,7 +61,12 @@ ColumnLayout {
 
     Detail {
         icon: "workspaces"
-        text: qsTr("Workspace: %1 (%2)").arg(root.client?.workspace.name ?? -1).arg(root.client?.workspace.id ?? -1)
+        text: {
+            const wsId = root.client?.workspace.id ?? -1;
+            const wsName = root.client?.workspace.name ?? "";
+            const wsIdRoman = wsId > 0 ? Icons.toRoman(wsId) : wsId;
+            return qsTr("Workspace: %1 (%2)").arg(wsName).arg(wsIdRoman);
+        }
         color: Colours.palette.m3secondary
     }
 

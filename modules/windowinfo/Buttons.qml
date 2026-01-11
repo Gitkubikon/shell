@@ -1,5 +1,6 @@
 import qs.components
 import qs.services
+import qs.utils
 import qs.config
 import Quickshell.Widgets
 import QtQuick
@@ -83,7 +84,7 @@ ColumnLayout {
 
                     color: isCurrent ? Colours.tPalette.m3surfaceContainerHighest : Colours.palette.m3tertiaryContainer
                     onColor: isCurrent ? Colours.palette.m3onSurface : Colours.palette.m3onTertiaryContainer
-                    text: wsId
+                    text: Icons.toRoman(wsId)
                     disabled: isCurrent
 
                     function onClicked(): void {

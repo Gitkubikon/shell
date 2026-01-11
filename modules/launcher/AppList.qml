@@ -52,7 +52,7 @@ StyledListView {
         const text = search.text;
         const prefix = Config.launcher.actionPrefix;
         if (text.startsWith(prefix)) {
-            for (const action of ["calc", "scheme", "variant"])
+            for (const action of ["calc", "scheme", "variant", "passgen"])
                 if (text.startsWith(`${prefix}${action} `))
                     return action;
 
@@ -106,6 +106,14 @@ StyledListView {
             PropertyChanges {
                 model.values: M3Variants.query(search.text)
                 root.delegate: variantItem
+            }
+        },
+        State {
+            name: "passgen"
+
+            PropertyChanges {
+                model.values: ["main", "uuid", "hex 32", "base64 32", "pin 6", "password 32 -ns", "alpha 32"]
+                root.delegate: passGenItem
             }
         }
     ]
@@ -251,6 +259,14 @@ StyledListView {
         id: variantItem
 
         VariantItem {
+            list: root
+        }
+    }
+
+    Component {
+        id: passGenItem
+
+        PassGenItem {
             list: root
         }
     }

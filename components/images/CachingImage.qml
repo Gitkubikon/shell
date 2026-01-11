@@ -20,8 +20,9 @@ Item {
     property bool preferAnimated: true
 
     readonly property bool animated: manager.animated
-    readonly property Item contentItem: loader.status === Loader.Ready ? loader.item : null
-    readonly property int status: contentItem ? contentItem.status : Image.Null
+    readonly property Item contentItem: loader.item
+    // Use loader.status to avoid bindings that depend on the loaded item's status
+    readonly property int status: loader.status
 
     implicitWidth: 0
     implicitHeight: 0

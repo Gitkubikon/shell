@@ -6,6 +6,7 @@ import qs.components.filedialog
 import qs.services
 import qs.config
 import qs.utils
+import Caelestia.Internal as CaelestiaInternal
 import QtQuick
 
 Item {
@@ -14,11 +15,19 @@ Item {
     // Current wallpaper path (managed by Caelestia)
     property string source: Wallpapers.current
 
+    // Cached thumbnails for ultra-fast initial paint
+    property string thumbSource: Wallpapers.currentThumbnail
+
     // Expose the currently visible image item (for visualiser/shaders)
     readonly property Item current: activeSlot?.activeChild
 
     // Track which slot is currently active
     property Item activeSlot: one
+    // Serial to discard stale loads during rapid preview scrubbing
+    property int loadSerial: 0
+
+    property var sessionLock: null
+    readonly property bool sessionLocked: sessionLock ? sessionLock.secure : false
 
     anchors.fill: parent
 
@@ -27,9 +36,10 @@ Item {
         if (!source) {
             activeSlot = null;
         } else {
+            loadSerial++;
             // Update the inactive slot
             const nextSlot = (activeSlot === one) ? two : one;
-            nextSlot.loadAndBecomeActive(source);
+            nextSlot.loadAndBecomeActive(source, thumbSource, loadSerial);
         }
     }
 
@@ -81,7 +91,7 @@ Item {
                         StateLayer {
                             radius: parent.radius
                             color: Colours.palette.m3onPrimary
-                            function onClicked(): void { dialog.open(); }
+                            function onClicked() { dialog.open(); }
                         }
 
                         StyledText {
@@ -110,44 +120,105 @@ Item {
 
         // Path we want this slot to display
         property string path: ""
+        // Optional thumbnail for faster first paint
+        property string thumb: ""
 
-        // Determine renderer
-        readonly property bool isGif: path && path.toLowerCase().endsWith(".gif")
+        // Determine renderer (animated renderer for GIF or WebP)
+        readonly property bool isAnimatedFormat: path && (path.toLowerCase().endsWith(".gif") || path.toLowerCase().endsWith(".webp"))
+        readonly property bool isWebp: path && path.toLowerCase().endsWith(".webp")
 
         // The child that is currently visible (either staticImg or gifImg)
-        readonly property Item activeChild: isGif ? gifImg : staticImg
+        readonly property Item activeChild: isAnimatedFormat ? gifImg : staticImg
+
+        // Track which root load this slot represents
+        property int serial: -1
 
         // Load new wallpaper and become active when ready
-        function loadAndBecomeActive(newPath: string): void {
+        function loadAndBecomeActive(newPath, newThumb, newSerial) {
+            serial = newSerial;
             path = newPath;
+            thumb = newThumb;
+            activationTimeout.restart();
 
-            if (isGif) {
-                staticImg.visible = false;
-                staticImg.path = "";
+            // Clear everything first to force a reload
+            staticImg.visible = false;
+            staticImg.thumb = "";
+            staticImg.source = "";
+            staticImg.fullReady = false;
+            staticImg.path = "";
 
-                gifImg.source = newPath;
-                gifImg.visible = true;
-            } else {
-                gifImg.visible = false;
-                gifImg.playing = false;
-                gifImg.source = "";
+            gifImg.visible = false;
+            gifImg.playing = false;
+            gifImg.source = "";
 
-                staticImg.path = newPath;
-                staticImg.visible = true;
+            webpImg.visible = false;
+            webpImg.source = "";
+
+            // Defer loading to next tick to ensure QML clears the old image
+            reloadTimer.restart();
+        }
+
+        Timer {
+            id: reloadTimer
+            interval: 1
+            repeat: false
+            onTriggered: {
+                if (isAnimatedFormat) {
+                    if (isWebp) {
+                        webpImg.source = img.path;
+                        webpImg.visible = true;
+                    } else {
+                        gifImg.source = img.path;
+                        gifImg.visible = true;
+                    }
+                } else {
+                    staticImg.thumb = img.thumb;
+                    staticImg.thumbUrl = img.thumb ? Qt.resolvedUrl(img.thumb) : "";
+                    staticImg.fullSource = Qt.resolvedUrl(img.path);
+                    staticImg.fullReady = false;
+                    staticImg.source = staticImg.thumbUrl ? staticImg.thumbUrl : staticImg.fullSource;
+                    staticImg.path = img.path;
+                    staticImg.visible = true;
+                }
+
+                // Check if already ready (sync/cached load)
+                checkAndActivate();
             }
+        }
 
-            // Check if already ready (sync/cached load)
-            checkAndActivate();
+        // Force activation if decode stalls; avoids “stuck” previews
+        Timer {
+            id: activationTimeout
+            interval: 180
+            repeat: false
+            onTriggered: img.checkAndActivate(true)
         }
 
         // Check if ready and activate this slot
-        function checkAndActivate(): void {
-            if (activeChild.status !== Image.Ready) return;
+        function checkAndActivate(force = false) {
+            if (serial !== root.loadSerial)
+                return;
 
-            // Start GIF playback
-            if (isGif) {
-                gifImg.currentFrame = 0;
-                gifImg.playing = true;
+            if (!force) {
+                if (isAnimatedFormat) {
+                    if (isWebp) {
+                        if (webpImg.status !== CaelestiaInternal.WebpPlayer.Ready)
+                            return;
+                    } else {
+                        if (gifImg.status !== Image.Ready)
+                            return;
+                    }
+                } else if (staticImg.status !== Image.Ready) {
+                    return;
+                }
+            }
+
+            // Start GIF playback (playing is bound, just set frame)
+            if (isAnimatedFormat) {
+                if (!isWebp)
+                    gifImg.currentFrame = 0;
+                else
+                    webpImg.currentFrame = 0;
             }
 
             // Make this slot active
@@ -157,18 +228,44 @@ Item {
         // Crossfade/scale state lives on the slot wrapper
         opacity: 0
         scale: Wallpapers.showPreview ? 1 : 0.8
-        playbackEnabled: root.current === img && !root.sessionLocked
 
         // --- Static renderer (persistent) ---
         CachingImage {
             id: staticImg
             anchors.fill: parent
             visible: false
+            property string thumb: ""
+            property url fullSource: ""
+            property url thumbUrl: ""
+            property bool fullReady: false
+            // Try fast thumbnail first; fall back to full-res
+            source: thumb ? Qt.resolvedUrl(thumb) : ""
 
             onStatusChanged: {
-                if (status === Image.Ready && visible) {
-                    img.checkAndActivate();
+                if (!visible)
+                    return;
+
+                if (status === Image.Ready) {
+                    const isThumbSource = thumb && source.toString() === thumbUrl.toString();
+                    if (!isThumbSource) {
+                        fullReady = true;
+                        img.checkAndActivate();
+                    } else {
+                        // Thumb loaded; now request full-res
+                        source = fullSource;
+                    }
+                } else if (status === Image.Error) {
+                    // Fall back to full-res if thumb fails
+                    if (thumb && source.toString() === thumbUrl.toString()) {
+                        source = fullSource;
+                    }
                 }
+                // If decode drags, the timer will flip us to the new slot anyway
+            }
+
+            onVisibleChanged: {
+                if (visible)
+                    img.checkAndActivate();
             }
         }
 
@@ -177,9 +274,9 @@ Item {
             id: gifImg
             anchors.fill: parent
             visible: false
-            cache: false
-            asynchronous: false
-            playing: false
+            cache: true
+            asynchronous: true
+            playing: visible && (root.activeSlot === img) && !root.sessionLocked
             fillMode: Image.PreserveAspectCrop
 
             onStatusChanged: {
@@ -189,7 +286,32 @@ Item {
             }
 
             onVisibleChanged: {
-                if (!visible) playing = false;
+                if (visible)
+                    img.checkAndActivate();
+                else
+                    playing = false;
+            }
+        }
+
+        // --- WebP renderer (fallback, independent of Qt imageformat plugin) ---
+        CaelestiaInternal.WebpPlayer {
+            id: webpImg
+            anchors.fill: parent
+            visible: false
+            playing: visible && (root.activeSlot === img) && !root.sessionLocked
+            fillMode: Image.PreserveAspectCrop
+
+            onStatusChanged: {
+                if (status === CaelestiaInternal.WebpPlayer.Ready && visible) {
+                    img.checkAndActivate();
+                }
+            }
+
+            onVisibleChanged: {
+                if (visible)
+                    img.checkAndActivate();
+                else
+                    playing = false;
             }
         }
 
@@ -244,7 +366,7 @@ Item {
         // Initialize once at creation
         Component.onCompleted: {
             if (root.source && root.activeSlot === img) {
-                loadAndBecomeActive(root.source);
+                loadAndBecomeActive(root.source, root.thumbSource, root.loadSerial);
             }
         }
     }

@@ -71,6 +71,14 @@ JsonObject {
             dangerous: false
         },
         {
+            name: "PassGen",
+            icon: "key",
+            description: "Generate secure random passwords & keys",
+            command: ["autocomplete", "passgen"],
+            enabled: true,
+            dangerous: false
+        },
+        {
             name: "Transparency",
             icon: "opacity",
             description: "Change shell transparency",

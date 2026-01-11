@@ -27,6 +27,22 @@ ColumnLayout {
 
     spacing: 0
 
+    function toRoman(num) {
+        const romanNumerals = [
+            [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+            [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+            [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+        ];
+        let result = '';
+        for (let i = 0; i < romanNumerals.length; i++) {
+            while (num >= romanNumerals[i][0]) {
+                result += romanNumerals[i][1];
+                num -= romanNumerals[i][0];
+            }
+        }
+        return result;
+    }
+
     StyledText {
         id: indicator
 
@@ -34,9 +50,10 @@ ColumnLayout {
         Layout.preferredHeight: Config.bar.sizes.innerWidth - Appearance.padding.small * 2
 
         animate: true
+        font.pointSize: Appearance.font.size.smaller * 1.05
         text: {
             const ws = Hypr.workspaces.values.find(w => w.id === root.ws);
-            const wsName = !ws || ws.name == root.ws ? root.ws : ws.name[0];
+            const wsName = !ws || ws.name == root.ws ? root.toRoman(root.ws) : ws.name[0];
             let displayName = wsName.toString();
             if (Config.bar.workspaces.capitalisation.toLowerCase() === "upper") {
                 displayName = displayName.toUpperCase();

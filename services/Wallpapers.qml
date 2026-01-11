@@ -13,26 +13,34 @@ Searcher {
     readonly property string currentNamePath: `${Paths.state}/wallpaper/path.txt`
     readonly property list<string> smartArg: Config.services.smartScheme ? [] : ["--no-smart"]
 
+    readonly property string currentThumbPath: `${Paths.state}/wallpaper/thumbnail.jpg`
+
     property bool showPreview: false
     readonly property string current: showPreview ? previewPath : actualCurrent
+    readonly property string currentThumbnail: showPreview ? previewThumbnail : actualThumbnail
+
     property string previewPath
+    property string previewThumbnail
     property string actualCurrent
+    property string actualThumbnail
     property bool previewColourLock
 
-    function setWallpaper(path: string): void {
+    function setWallpaper(path, thumb) {
         actualCurrent = path;
+        actualThumbnail = thumb || currentThumbPath;
         Quickshell.execDetached(["caelestia", "wallpaper", "-f", path, ...smartArg]);
     }
 
-    function preview(path: string): void {
+    function preview(path, thumb) {
         previewPath = path;
+        previewThumbnail = thumb || "";
         showPreview = true;
 
         if (Colours.scheme === "dynamic")
             getPreviewColoursProc.running = true;
     }
 
-    function stopPreview(): void {
+    function stopPreview() {
         showPreview = false;
         if (!previewColourLock)
             Colours.showPreview = false;
@@ -48,15 +56,15 @@ Searcher {
     IpcHandler {
         target: "wallpaper"
 
-        function get(): string {
+        function get() {
             return root.actualCurrent;
         }
 
-        function set(path: string): void {
+        function set(path: string) {
             root.setWallpaper(path);
         }
 
-        function list(): string {
+        function list() {
             return root.list.map(w => w.path).join("\n");
         }
     }
@@ -67,6 +75,7 @@ Searcher {
         onFileChanged: reload()
         onLoaded: {
             root.actualCurrent = text().trim();
+            root.actualThumbnail = root.currentThumbPath;
             root.previewColourLock = false;
         }
     }

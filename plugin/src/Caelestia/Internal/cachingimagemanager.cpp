@@ -3,11 +3,15 @@
 #include <QtQuick/qquickwindow.h>
 #include <qcryptographichash.h>
 #include <qdir.h>
+#include <qfile.h>
 #include <qfileinfo.h>
 #include <qfuturewatcher.h>
 #include <qimagereader.h>
 #include <qpainter.h>
 #include <qtconcurrentrun.h>
+#include <memory>
+#include "../webputils.hpp"
+#include <webp/demux.h>
 
 namespace caelestia::internal {
 
@@ -188,21 +192,26 @@ void CachingImageManager::updateSource(const QString& path) {
 
     const auto watcher = new QFutureWatcher<QString>(this);
 
-    connect(watcher, &QFutureWatcher<QString>::finished, this, [watcher, path, this]() {
-        if (m_path != path) {
-            // Object is destroyed or path has changed, ignore
-            watcher->deleteLater();
-            return;
-        }
+        connect(watcher, &QFutureWatcher<QString>::finished, this, [watcher, path, this]() {
+            if (m_path != path) {
+                // Object is destroyed or path has changed, ignore
+                watcher->deleteLater();
+                return;
+            }
 
-        const QSize size = effectiveSize();
+            const QSize size = effectiveSize();
 
-        if (!m_item || !size.width() || !size.height()) {
-            watcher->deleteLater();
-            return;
-        }
+            if (!m_item || !size.width() || !size.height()) {
+                // Size not ready yet; clear sha so a later updateSource can retry instead of sticking
+                if (m_shaPath == path) {
+                    m_shaPath.clear();
+                }
+                watcher->deleteLater();
+                return;
+            }
 
-        const QString fillMode = m_item->property("fillMode").toString();
+        const int mode = m_item->property("fillMode").toInt();
+        const QString fillMode = mode == Qt::KeepAspectRatio ? "PreserveAspectFit" : (mode == Qt::KeepAspectRatioByExpanding ? "PreserveAspectCrop" : "Stretch");
         // clang-format off
         const QString filename = QString("%1@%2x%3-%4.png")
             .arg(watcher->result()).arg(size.width()).arg(size.height())
@@ -228,8 +237,43 @@ void CachingImageManager::updateSource(const QString& path) {
         if (reader.canRead()) {
             m_item->setProperty("source", cache);
         } else {
-            m_item->setProperty("source", QUrl::fromLocalFile(path));
-            createCache(path, cache.toLocalFile(), fillMode, size);
+            bool wroteCache = false;
+
+            // Synchronous WebP fallback: decode first frame and save as PNG
+            if (path.endsWith(".webp", Qt::CaseInsensitive)) {
+                if (const auto webp = decodeWebpFirstFrame(path); webp.has_value()) {
+                    QImage image = *webp;
+
+                    // Mirror the scaling logic from createCache to match target size/fill mode
+                    if (size.isValid()) {
+                        const Qt::AspectRatioMode mode = fillMode == "PreserveAspectCrop"
+                            ? Qt::KeepAspectRatioByExpanding
+                            : fillMode == "PreserveAspectFit" ? Qt::KeepAspectRatio : Qt::IgnoreAspectRatio;
+                        image = image.scaled(size, mode, Qt::SmoothTransformation);
+
+                        if (fillMode == "PreserveAspectCrop" || fillMode == "PreserveAspectFit") {
+                            QImage canvas(size, QImage::Format_ARGB32);
+                            canvas.fill(Qt::transparent);
+
+                            QPainter painter(&canvas);
+                            painter.drawImage((size.width() - image.width()) / 2, (size.height() - image.height()) / 2, image);
+                            painter.end();
+                            image = canvas;
+                        }
+                    }
+
+                    const QString parent = QFileInfo(cache.toLocalFile()).absolutePath();
+                    if (QDir().mkpath(parent) && image.save(cache.toLocalFile())) {
+                        wroteCache = true;
+                        m_item->setProperty("source", cache);
+                    }
+                }
+            }
+
+            if (!wroteCache) {
+                m_item->setProperty("source", QUrl::fromLocalFile(path));
+                createCache(path, cache.toLocalFile(), fillMode, size);
+            }
         }
 
         // Clear current running sha if same
@@ -250,11 +294,33 @@ QUrl CachingImageManager::cachePath() const {
 void CachingImageManager::createCache(
     const QString& path, const QString& cache, const QString& fillMode, const QSize& size) const {
     QThreadPool::globalInstance()->start([path, cache, fillMode, size] {
-        QImage image(path);
+        QImageReader reader(path);
+        reader.setAutoTransform(true);
 
+        // Decode as close to target as possible to save time/memory for huge wallpapers
+        if (size.isValid()) {
+            const QSize native = reader.size();
+            if (native.isValid()) {
+                const Qt::AspectRatioMode mode = fillMode == "PreserveAspectCrop"
+                    ? Qt::KeepAspectRatioByExpanding
+                    : fillMode == "PreserveAspectFit" ? Qt::KeepAspectRatio : Qt::IgnoreAspectRatio;
+                reader.setScaledSize(native.scaled(size, mode));
+            }
+        }
+
+        QImage image = reader.read();
         if (image.isNull()) {
-            qWarning() << "CachingImageManager::createCache: failed to read" << path;
-            return;
+            // Fallback: decode WebP without Qt plugin support
+            if (path.endsWith(".webp", Qt::CaseInsensitive)) {
+                if (const auto webp = decodeWebpFirstFrame(path); webp.has_value()) {
+                    image = *webp;
+                }
+            }
+
+            if (image.isNull()) {
+                qWarning() << "CachingImageManager::createCache: failed to read" << path << reader.errorString();
+                return;
+            }
         }
 
         image.convertTo(QImage::Format_ARGB32);
@@ -301,10 +367,33 @@ QString CachingImageManager::sha256sum(const QString& path) {
 
 bool CachingImageManager::isAnimated(const QString& path) {
     QImageReader reader(path);
-    if (!reader.canRead() || !reader.supportsAnimation()) {
-        return false;
+    if (reader.canRead() && reader.supportsAnimation()) {
+        return reader.imageCount() > 1;
     }
-    return reader.imageCount() > 1;
+
+    const auto supportedFormats = QImageReader::supportedImageFormats();
+    const bool supportsWebp = supportedFormats.contains("webp");
+
+    // Fallback: detect animated WebP only when the plugin exists
+    if (supportsWebp && path.endsWith(".webp", Qt::CaseInsensitive)) {
+        QFile file(path);
+        if (file.open(QIODevice::ReadOnly)) {
+            const QByteArray data = file.readAll();
+            WebPData webpData;
+            WebPDataInit(&webpData);
+            webpData.bytes = reinterpret_cast<const uint8_t*>(data.constData());
+            webpData.size = static_cast<size_t>(data.size());
+
+            std::unique_ptr<WebPDemuxer, decltype(&WebPDemuxDelete)> demux(
+                WebPDemux(&webpData), &WebPDemuxDelete);
+            if (demux) {
+                const uint32_t frames = WebPDemuxGetI(demux.get(), WEBP_FF_FRAME_COUNT);
+                return frames > 1;
+            }
+        }
+    }
+
+    return false;
 }
 
 } // namespace caelestia::internal
