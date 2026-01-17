@@ -11,7 +11,6 @@ import QtQuick
 Loader {
     id: backgroundLoader
 
-    asynchronous: true
     active: Config.background.enabled
 
     property var lock
@@ -52,7 +51,6 @@ Loader {
                 anchors.margins: Appearance.padding.large
 
                 active: Config.background.desktopClock.enabled
-                asynchronous: true
 
                 source: "DesktopClock.qml"
             }

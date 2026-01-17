@@ -175,9 +175,7 @@ Item {
                 Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
                 Layout.preferredHeight: Config.bar.sizes.innerWidth - Appearance.padding.normal * 2  // Slightly smaller for compactness
 
-                asynchronous: true
-                // Check if icon contains only Roman numeral characters (I, V, X, L, C, D, M)
-                sourceComponent: /^[IVXLCDM]+$/.test(ws.icon) || ws.icon.length === 1 ? letterComp : iconComp
+                sourceComponent: ws.icon.length === 1 ? letterComp : iconComp
 
                 Component {
                     id: iconComp

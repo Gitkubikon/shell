@@ -19,7 +19,7 @@ Singleton {
     property bool fastPolling: false
     property int fastPollCount: 0
 
-    function start(extraArgs: list<string>): void {
+    function start(extraArgs = []): void {
         needsStart = true;
         startArgs = extraArgs || [];
         startFastPolling();
