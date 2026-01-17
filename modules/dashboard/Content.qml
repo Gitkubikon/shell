@@ -105,7 +105,7 @@ Item {
                 }
 
                 Pane {
-                    sourceComponent: AiChat {}
+                    sourceComponent: Weather {}
                 }
             }
 

@@ -20,6 +20,7 @@ JsonObject {
         property bool schemes: false
         property bool variants: false
         property bool wallpapers: false
+        property bool vpn: false
     }
 
     component Sizes: JsonObject {
@@ -75,6 +76,14 @@ JsonObject {
             icon: "key",
             description: "Generate secure random passwords & keys",
             command: ["autocomplete", "passgen"],
+            enabled: true,
+            dangerous: false
+        },
+        {
+            name: "VPN",
+            icon: "vpn_key",
+            description: "Connect to a VPN server",
+            command: ["autocomplete", "vpn"],
             enabled: true,
             dangerous: false
         },

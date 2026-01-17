@@ -17,14 +17,18 @@ IconImage {
         colorizationColor: root.colour
     }
 
+    function requestUpdateSoon(): void {
+        Qt.callLater(() => analyser.requestUpdate());
+    }
+
     layer.onEnabledChanged: {
         if (layer.enabled && status === Image.Ready)
-            analyser.requestUpdate();
+            requestUpdateSoon();
     }
 
     onStatusChanged: {
         if (layer.enabled && status === Image.Ready)
-            analyser.requestUpdate();
+            requestUpdateSoon();
     }
 
     ImageAnalyser {

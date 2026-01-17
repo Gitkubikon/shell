@@ -615,6 +615,11 @@ default, you must create it manually.
 					"name": "wireguard",
 					"interface": "your-connection-name",
 					"displayName": "Wireguard (Your VPN)"
+				},
+				{
+					"name": "openvpn",
+					"interface": "your-config-name",
+					"displayName": "OpenVPN (Your VPN)"
 				}
 			]
 		}
@@ -1015,6 +1020,11 @@ default, you must create it manually.
                     "name": "wireguard",
                     "interface": "your-connection-name",
                     "displayName": "Wireguard (Your VPN)"
+                },
+                {
+                    "name": "openvpn",
+                    "interface": "your-config-name",
+                    "displayName": "OpenVPN (Your VPN)"
                 }
             ]
         }

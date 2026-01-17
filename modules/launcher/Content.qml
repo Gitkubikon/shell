@@ -21,6 +21,27 @@ Item {
     implicitWidth: listWrapper.width + padding * 2
     implicitHeight: searchWrapper.height + listWrapper.height + padding * 2
 
+    Connections {
+        target: LauncherControl
+
+        function onOpenWithSearch(searchText: string): void {
+            Qt.callLater(function() {
+                search.text = searchText;
+                search.forceActiveFocus();
+            });
+        }
+    }
+
+    Connections {
+        target: root.visibilities
+
+        function onLauncherChanged(): void {
+            if (root.visibilities.launcher) {
+                search.forceActiveFocus();
+            }
+        }
+    }
+
     Item {
         id: listWrapper
 
@@ -133,8 +154,18 @@ Item {
                 target: root.visibilities
 
                 function onLauncherChanged(): void {
-                    if (!root.visibilities.launcher)
+                    if (!root.visibilities.launcher) {
                         search.text = "";
+                    } else if (LauncherControl.pendingSearchText) {
+                        // Don't clear if we have pending search text
+                        Qt.callLater(function() {
+                            if (LauncherControl.pendingSearchText) {
+                                search.text = LauncherControl.pendingSearchText;
+                                LauncherControl.pendingSearchText = "";
+                                search.forceActiveFocus();
+                            }
+                        });
+                    }
                 }
 
                 function onSessionChanged(): void {

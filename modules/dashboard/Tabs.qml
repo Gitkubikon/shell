@@ -46,8 +46,8 @@ Item {
         }
 
         Tab {
-            iconName: "smart_toy"
-            text: qsTr("AI Chat")
+            iconName: "cloud"
+            text: qsTr("Weather")
         }
 
         // Tab {

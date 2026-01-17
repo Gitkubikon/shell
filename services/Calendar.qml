@@ -24,6 +24,11 @@ Singleton {
 
     readonly property int refreshIntervalMs: Config.services?.calendarUpdateInterval ?? 300000
 
+    Component.onCompleted: {
+        // Start initial backend check
+        backendCheckProcess.running = true;
+    }
+
     /**
      * Return events that occur on the same day as `date`.
      */
@@ -57,10 +62,8 @@ Singleton {
         const dayCount = Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1);
 
         getEventsProcess.command = [
-            "caelestia", "calendar",
-            "-s", startStr,
-            "-d", dayCount.toString(),
-            "--json"
+            "/bin/bash", "-c",
+            "export PATH=$HOME/.local/bin:$PATH; exec caelestia calendar -s " + startStr + " -d " + dayCount.toString() + " --json"
         ];
         getEventsProcess.running = true;
     }
@@ -83,9 +86,10 @@ Singleton {
     Process {
         id: backendCheckProcess
 
-        command: ["caelestia", "calendar", "-d", "1", "--json"]
-        running: true
+        command: ["/bin/bash", "-c", "export PATH=$HOME/.local/bin:$PATH; exec caelestia calendar -d 1 --json"]
+        running: false
         stdout: StdioCollector {}
+        stderr: StdioCollector { id: backendCheckStderr }
         onExited: (exitCode) => {
             root.khalAvailable = (exitCode === 0);
             if (root.khalAvailable) {
@@ -93,9 +97,27 @@ Singleton {
                 root.errorMessage = "";
                 root.refresh();
                 refreshTimer.start();
+                backendRetryTimer.stop();
             } else {
                 root.errorMessage = qsTr("caelestia calendar command failed (exit %1)").arg(exitCode);
-                console.warn("[Calendar] Caelestia calendar backend not available; calendar events disabled.");
+                console.warn("[Calendar] Caelestia calendar backend not available; retrying in 5 seconds...");
+                if (backendCheckStderr.text.trim().length > 0)
+                    console.warn("[Calendar] Backend stderr:", backendCheckStderr.text.trim());
+                backendRetryTimer.start();
+            }
+        }
+    }
+
+    Timer {
+        id: backendRetryTimer
+        interval: 5000  // Retry every 5 seconds
+        repeat: true
+        onTriggered: {
+            if (!root.khalAvailable) {
+                console.log("[Calendar] Retrying backend check...");
+                backendCheckProcess.running = true;
+            } else {
+                stop();
             }
         }
     }

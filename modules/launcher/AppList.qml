@@ -52,7 +52,7 @@ StyledListView {
         const text = search.text;
         const prefix = Config.launcher.actionPrefix;
         if (text.startsWith(prefix)) {
-            for (const action of ["calc", "scheme", "variant", "passgen"])
+            for (const action of ["calc", "scheme", "variant", "passgen", "vpn"])
                 if (text.startsWith(`${prefix}${action} `))
                     return action;
 
@@ -65,6 +65,8 @@ StyledListView {
     onStateChanged: {
         if (state === "scheme" || state === "variant")
             Schemes.reload();
+        else if (state === "vpn")
+            VpnServers.reload();
     }
 
     states: [
@@ -114,6 +116,14 @@ StyledListView {
             PropertyChanges {
                 model.values: ["main", "uuid", "hex 32", "base64 32", "pin 6", "password 32 -ns", "alpha 32"]
                 root.delegate: passGenItem
+            }
+        },
+        State {
+            name: "vpn"
+
+            PropertyChanges {
+                model.values: VpnServers.query(search.text)
+                root.delegate: vpnItem
             }
         }
     ]
@@ -267,6 +277,14 @@ StyledListView {
         id: passGenItem
 
         PassGenItem {
+            list: root
+        }
+    }
+
+    Component {
+        id: vpnItem
+
+        VpnItem {
             list: root
         }
     }

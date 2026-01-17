@@ -95,7 +95,14 @@ Item {
         onCurrentIndexChanged: currentIndex = Qt.binding(() => model.values.findIndex(w => w.name === root.activeSpecial))
 
         model: ScriptModel {
-            values: Hypr.workspaces.values.filter(w => w.name.startsWith("special:") && (!Config.bar.workspaces.perMonitorWorkspaces || w.monitor === root.monitor))
+            values: Hypr.workspaces.values.filter(w => w.name.startsWith("special:") && (!Config.bar.workspaces.perMonitorWorkspaces || w.monitor === root.monitor)).sort((a, b) => {
+                const aNum = parseInt(a.name.slice(8));
+                const bNum = parseInt(b.name.slice(8));
+                if (isNaN(aNum) && isNaN(bNum)) return 0;
+                if (isNaN(aNum)) return 1;
+                if (isNaN(bNum)) return -1;
+                return aNum - bNum;
+            })
         }
 
         // Fixed: Changed to ApplyRange to prevent jumping to bottom

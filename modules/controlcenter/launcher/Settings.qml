@@ -165,6 +165,15 @@ ColumnLayout {
                 Config.save();
             }
         }
+
+        ToggleRow {
+            label: qsTr("VPN")
+            checked: Config.launcher.useFuzzy.vpn
+            toggle.onToggled: {
+                Config.launcher.useFuzzy.vpn = checked;
+                Config.save();
+            }
+        }
     }
 
     SectionHeader {
@@ -215,4 +224,3 @@ ColumnLayout {
         }
     }
 }
-

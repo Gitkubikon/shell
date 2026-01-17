@@ -60,6 +60,12 @@ Singleton {
                 disconnectCmd: ["tailscale", "down"],
                 interface: "tailscale0",
                 displayName: "Tailscale"
+            },
+            "openvpn": {
+                connectCmd: ["pkexec", "systemctl", "start", "openvpn@" + iface],
+                disconnectCmd: ["pkexec", "systemctl", "stop", "openvpn@" + iface],
+                interface: "tun0",
+                displayName: iface
             }
         };
 

@@ -89,7 +89,14 @@ StyledRect {
                 checked: VPN.connected
                 enabled: !VPN.connecting
                 visible: VPN.enabled
-                onClicked: VPN.toggle()
+                onClicked: {
+                    if (VPN.connected) {
+                        VPN.disconnect();
+                    } else {
+                        LauncherControl.openLauncher(root.visibilities, `${Config.launcher.actionPrefix}vpn `);
+                        root.visibilities.utilities = false;
+                    }
+                }
             }
 
             Toggle {

@@ -72,7 +72,6 @@ Item {
             smooth: !root.PathView.view.moving
             preferAnimated: root.animatePreview
             playbackEnabled: root.animatePreview
-            cache: true
 
             anchors.fill: parent
         }
