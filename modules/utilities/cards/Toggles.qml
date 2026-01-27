@@ -88,22 +88,10 @@ StyledRect {
                 icon: "vpn_key"
                 checked: VPN.connected
                 enabled: !VPN.connecting
-                visible: VPN.enabled
-                onClicked: {
-                    if (VPN.connected) {
-                        VPN.disconnect();
-                    } else {
-                        LauncherControl.openLauncher(root.visibilities, `${Config.launcher.actionPrefix}vpn `);
-                        root.visibilities.utilities = false;
-                    }
-                }
+                visible: Config.utilities.vpn.provider.some(p => typeof p === "object" ? (p.enabled === true) : false)
+                onClicked: VPN.toggle()
             }
 
-            Toggle {
-                icon: Config.services.nightLight.automatic ? "schedule" : "bedtime"
-                checked: Hyprsunset.active
-                onClicked: Hyprsunset.toggle()
-            }
         }
     }
 
