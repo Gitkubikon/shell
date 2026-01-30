@@ -31,6 +31,13 @@ JsonObject {
 
     component Vpn: JsonObject {
         property bool enabled: false
-        property list<var> provider: ["netbird"]
+        property list<var> provider: [
+            {
+                "name": "wireguard",
+                "interface": "wg0",
+                "displayName": "Wireguard",
+                "enabled": false
+            }
+        ]
     }
 }
