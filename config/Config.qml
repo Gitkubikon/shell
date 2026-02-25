@@ -123,6 +123,8 @@ Singleton {
                 }
             },
             anim: {
+                mediaGifSpeedAdjustment: 300,
+                sessionGifSpeed: 0.7,
                 durations: {
                     scale: appearance.anim.durations.scale
                 }
@@ -159,6 +161,7 @@ Singleton {
     function serializeBackground(): var {
         return {
             enabled: background.enabled,
+            wallpaperEnabled: background.wallpaperEnabled,
             desktopClock: {
                 enabled: background.desktopClock.enabled,
                 scale: background.desktopClock.scale,
@@ -240,7 +243,8 @@ Singleton {
                 batteryWidth: bar.sizes.batteryWidth,
                 networkWidth: bar.sizes.networkWidth
             },
-            entries: bar.entries
+            entries: bar.entries,
+            excludedScreens: bar.excludedScreens
         };
     }
 
@@ -255,8 +259,16 @@ Singleton {
         return {
             enabled: dashboard.enabled,
             showOnHover: dashboard.showOnHover,
-            mediaUpdateInterval: dashboard.mediaUpdateInterval,
+            updateInterval: dashboard.updateInterval,
             dragThreshold: dashboard.dragThreshold,
+            performance: {
+                showBattery: dashboard.performance.showBattery,
+                showGpu: dashboard.performance.showGpu,
+                showCpu: dashboard.performance.showCpu,
+                showMemory: dashboard.performance.showMemory,
+                showStorage: dashboard.performance.showStorage,
+                showNetwork: dashboard.performance.showNetwork
+            },
             sizes: {
                 tabIndicatorHeight: dashboard.sizes.tabIndicatorHeight,
                 tabIndicatorSpacing: dashboard.sizes.tabIndicatorSpacing,
@@ -295,6 +307,7 @@ Singleton {
             enableDangerousActions: launcher.enableDangerousActions,
             dragThreshold: launcher.dragThreshold,
             vimKeybinds: launcher.vimKeybinds,
+            favouriteApps: launcher.favouriteApps,
             hiddenApps: launcher.hiddenApps,
             useFuzzy: {
                 apps: launcher.useFuzzy.apps,
@@ -348,6 +361,12 @@ Singleton {
             enabled: session.enabled,
             dragThreshold: session.dragThreshold,
             vimKeybinds: session.vimKeybinds,
+            icons: {
+                logout: session.icons.logout,
+                shutdown: session.icons.shutdown,
+                hibernate: session.icons.hibernate,
+                reboot: session.icons.reboot
+            },
             commands: {
                 logout: session.commands.logout,
                 shutdown: session.commands.shutdown,
@@ -424,6 +443,7 @@ Singleton {
         return {
             weatherLocation: services.weatherLocation,
             useFahrenheit: services.useFahrenheit,
+            useFahrenheitPerformance: services.useFahrenheitPerformance,
             useTwelveHourClock: services.useTwelveHourClock,
             gpuType: services.gpuType,
             visualiserBars: services.visualiserBars,
