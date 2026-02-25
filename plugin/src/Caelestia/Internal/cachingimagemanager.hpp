@@ -16,14 +16,10 @@ class CachingImageManager : public QObject {
     Q_PROPERTY(QString path READ path WRITE setPath NOTIFY pathChanged)
     Q_PROPERTY(QUrl cachePath READ cachePath NOTIFY cachePathChanged)
 
-    Q_PROPERTY(bool animated READ animated NOTIFY animatedChanged)
-    Q_PROPERTY(bool preferAnimated READ preferAnimated WRITE setPreferAnimated NOTIFY preferAnimatedChanged)
-
 public:
     explicit CachingImageManager(QObject* parent = nullptr)
         : QObject(parent)
-        , m_item(nullptr)
-        , m_animated(false) {}
+        , m_item(nullptr) {}
 
     [[nodiscard]] QQuickItem* item() const;
     void setItem(QQuickItem* item);
@@ -36,10 +32,6 @@ public:
 
     [[nodiscard]] QUrl cachePath() const;
 
-    [[nodiscard]] bool animated() const { return m_animated; }
-    [[nodiscard]] bool preferAnimated() const { return m_preferAnimated; }
-    void setPreferAnimated(bool preferAnimated);
-
     Q_INVOKABLE void updateSource();
     Q_INVOKABLE void updateSource(const QString& path);
 
@@ -50,8 +42,6 @@ signals:
     void pathChanged();
     void cachePathChanged();
     void usingCacheChanged();
-    void animatedChanged();
-    void preferAnimatedChanged();
 
 private:
     QString m_shaPath;
@@ -62,9 +52,6 @@ private:
     QString m_path;
     QUrl m_cachePath;
 
-    bool m_animated;
-    bool m_preferAnimated = true;
-
     QMetaObject::Connection m_widthConn;
     QMetaObject::Connection m_heightConn;
 
@@ -72,8 +59,6 @@ private:
     [[nodiscard]] QSize effectiveSize() const;
 
     void createCache(const QString& path, const QString& cache, const QString& fillMode, const QSize& size) const;
-
-    [[nodiscard]] static bool isAnimated(const QString& path);
     [[nodiscard]] static QString sha256sum(const QString& path);
 };
 

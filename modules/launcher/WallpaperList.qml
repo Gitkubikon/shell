@@ -53,41 +53,12 @@ PathView {
         onValuesChanged: root.currentIndex = search ? 0 : values.findIndex(w => w.path === Wallpapers.actualCurrent)
     }
 
-    property var pendingPreview: null
-
     Component.onCompleted: currentIndex = Wallpapers.list.findIndex(w => w.path === Wallpapers.actualCurrent)
-    Component.onDestruction: {
-        previewDebounce.stop();
-        Wallpapers.stopPreview();
-    }
-
-    Timer {
-        id: previewDebounce
-        interval: 80
-        repeat: true
-        running: false
-
-        onTriggered: {
-            if (root.pendingPreview) {
-                Wallpapers.preview(root.pendingPreview.path, root.pendingPreview.previewPath);
-                root.pendingPreview = null;
-                return;
-            }
-            stop();
-        }
-    }
+    Component.onDestruction: Wallpapers.stopPreview()
 
     onCurrentItemChanged: {
-        if (!currentItem)
-            return;
-
-        root.pendingPreview = {
-            path: currentItem.modelData.path,
-            previewPath: currentItem.modelData.previewPath
-        };
-
-        if (!previewDebounce.running)
-            previewDebounce.start();
+        if (currentItem)
+            Wallpapers.preview(currentItem.modelData.path);
     }
 
     implicitWidth: Math.min(numItems, count) * itemWidth

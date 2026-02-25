@@ -135,9 +135,9 @@ Singleton {
 
         command: ["ip", "link", "show"]
         environment: ({
-            LANG: "C.UTF-8",
-            LC_ALL: "C.UTF-8"
-        })
+                LANG: "C.UTF-8",
+                LC_ALL: "C.UTF-8"
+            })
         stdout: StdioCollector {
             onStreamFinished: {
                 const iface = root.currentConfig ? root.currentConfig.interface : "";

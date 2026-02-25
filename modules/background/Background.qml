@@ -9,11 +9,7 @@ import Quickshell.Wayland
 import QtQuick
 
 Loader {
-    id: backgroundLoader
-
     active: Config.background.enabled
-
-    property var lock
 
     sourceComponent: Variants {
         model: Quickshell.screens
@@ -41,7 +37,6 @@ Loader {
 
                 Wallpaper {
                     id: wallpaper
-                    sessionLock: backgroundLoader.lock ? backgroundLoader.lock.lock : null
                 }
 
                 Visualiser {
@@ -50,7 +45,6 @@ Loader {
                     wallpaper: wallpaper
                 }
             }
-
 
             Loader {
                 id: clockLoader
@@ -82,7 +76,8 @@ Loader {
                         AnchorChanges {
                             target: clockLoader
                             anchors.top: parent.top
-                            anchors.right: parent.right }
+                            anchors.right: parent.right
+                        }
                     },
                     State {
                         name: "middle-left"

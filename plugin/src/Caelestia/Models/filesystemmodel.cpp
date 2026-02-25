@@ -1,80 +1,16 @@
 #include "filesystemmodel.hpp"
 
 #include <qdiriterator.h>
-#include <qfileinfo.h>
 #include <qfuturewatcher.h>
 #include <qtconcurrentrun.h>
-#include <qstandardpaths.h>
-#include <qcryptographichash.h>
-#include <qimage.h>
-#include <qdir.h>
-#include "../webputils.hpp"
 
 namespace caelestia::models {
 
-namespace {
-
-QString previewCacheDir() {
-    const auto base = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
-    return base + "/caelestia/imagecache/wallpreviews";
-}
-
-QString cacheKey(const QFileInfo& info) {
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    hash.addData(info.absoluteFilePath().toUtf8());
-    hash.addData(QByteArray::number(info.size()));
-    hash.addData(QByteArray::number(info.lastModified().toMSecsSinceEpoch()));
-    return hash.result().toHex();
-}
-
-QString ensurePreview(const QString& path) {
-    const QFileInfo info(path);
-    if (!info.exists() || !info.isFile()) {
-        return {};
-    }
-
-    const QString dir = previewCacheDir();
-    QDir().mkpath(dir);
-    const QString cached = dir + "/" + cacheKey(info) + ".png";
-
-    if (QFileInfo::exists(cached)) {
-        return cached;
-    }
-
-    QImageReader reader(path);
-    reader.setAutoTransform(true);
-
-    const QSize native = reader.size();
-    if (native.isValid()) {
-        reader.setScaledSize(native.scaled(QSize(512, 512), Qt::KeepAspectRatio));
-    }
-
-    QImage image = reader.read();
-    if (image.isNull()) {
-        const auto fallbackWebp = decodeWebpFirstFrame(path);
-        if (fallbackWebp.has_value()) {
-            image = *fallbackWebp;
-        } else {
-            return {};
-        }
-    }
-
-    if (!image.save(cached, "PNG")) {
-        return {};
-    }
-
-    return cached;
-}
-
-} // namespace
-
-FileSystemEntry::FileSystemEntry(
-    const QString& path, const QString& relativePath, const QString& previewPath, QObject* parent)
+FileSystemEntry::FileSystemEntry(const QString& path, const QString& relativePath, QObject* parent)
     : QObject(parent)
     , m_fileInfo(path)
     , m_path(path)
     , m_relativePath(relativePath)
-    , m_previewPath(previewPath)
     , m_isImageInitialised(false)
     , m_mimeTypeInitialised(false) {}
 
@@ -84,10 +20,6 @@ QString FileSystemEntry::path() const {
 
 QString FileSystemEntry::relativePath() const {
     return m_relativePath;
-};
-
-QString FileSystemEntry::previewPath() const {
-    return m_previewPath;
 };
 
 QString FileSystemEntry::name() const {
@@ -363,19 +295,24 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
         oldPaths << entry->path();
     }
 
-    const auto future = QtConcurrent::run([=](QPromise<QPair<QSet<QString>, QHash<QString, QString>>>& promise) {
+    const auto future = QtConcurrent::run([=](QPromise<QPair<QSet<QString>, QSet<QString>>>& promise) {
         const auto flags = recursive ? QDirIterator::Subdirectories : QDirIterator::NoIteratorFlags;
 
         std::optional<QDirIterator> iter;
 
         if (filter == Images) {
-            // Allow uppercase/lowercase extensions by skipping name filters and relying on canRead()
+            QStringList extraNameFilters = nameFilters;
+            const auto formats = QImageReader::supportedImageFormats();
+            for (const auto& format : formats) {
+                extraNameFilters << "*." + format;
+            }
+
             QDir::Filters filters = QDir::Files;
             if (showHidden) {
                 filters |= QDir::Hidden;
             }
 
-            iter.emplace(dir, QStringList(), filters, flags);
+            iter.emplace(dir, extraNameFilters, filters, flags);
         } else {
             QDir::Filters filters;
 
@@ -398,7 +335,7 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
             }
         }
 
-        QHash<QString, QString> newPaths;
+        QSet<QString> newPaths;
         while (iter->hasNext()) {
             if (promise.isCanceled()) {
                 return;
@@ -411,29 +348,16 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
                 if (!reader.canRead()) {
                     continue;
                 }
-
-                const QString previewPath = ensurePreview(path);
-                if (previewPath.isEmpty()) {
-                    continue;
-                }
-
-                newPaths.insert(path, previewPath);
-                continue;
             }
 
-            newPaths.insert(path, path);
+            newPaths.insert(path);
         }
 
-        QSet<QString> newPathKeys;
-        newPathKeys.reserve(newPaths.size());
-        for (auto it = newPaths.constBegin(); it != newPaths.constEnd(); ++it) {
-            newPathKeys.insert(it.key());
-        }
-        if (promise.isCanceled() || newPathKeys == oldPaths) {
+        if (promise.isCanceled() || newPaths == oldPaths) {
             return;
         }
 
-        promise.addResult(qMakePair(oldPaths - newPathKeys, newPaths));
+        promise.addResult(qMakePair(oldPaths - newPaths, newPaths - oldPaths));
     });
 
     if (m_futures.contains(dir)) {
@@ -441,9 +365,9 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
     }
     m_futures.insert(dir, future);
 
-    const auto watcher = new QFutureWatcher<QPair<QSet<QString>, QHash<QString, QString>>>(this);
+    const auto watcher = new QFutureWatcher<QPair<QSet<QString>, QSet<QString>>>(this);
 
-    connect(watcher, &QFutureWatcher<QPair<QSet<QString>, QHash<QString, QString>>>::finished, this, [dir, watcher, this]() {
+    connect(watcher, &QFutureWatcher<QPair<QSet<QString>, QSet<QString>>>::finished, this, [dir, watcher, this]() {
         m_futures.remove(dir);
 
         if (!watcher->future().isResultReadyAt(0)) {
@@ -460,7 +384,7 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
     watcher->setFuture(future);
 }
 
-void FileSystemModel::applyChanges(const QSet<QString>& removedPaths, const QHash<QString, QString>& addedPaths) {
+void FileSystemModel::applyChanges(const QSet<QString>& removedPaths, const QSet<QString>& addedPaths) {
     QList<int> removedIndices;
     for (int i = 0; i < m_entries.size(); ++i) {
         if (removedPaths.contains(m_entries[i]->path())) {
@@ -499,9 +423,8 @@ void FileSystemModel::applyChanges(const QSet<QString>& removedPaths, const QHas
 
     // Create new entries
     QList<FileSystemEntry*> newEntries;
-    for (auto it = addedPaths.constBegin(); it != addedPaths.constEnd(); ++it) {
-        const auto& path = it.key();
-        newEntries << new FileSystemEntry(path, m_dir.relativeFilePath(path), it.value(), this);
+    for (const auto& path : addedPaths) {
+        newEntries << new FileSystemEntry(path, m_dir.relativeFilePath(path), this);
     }
     std::sort(newEntries.begin(), newEntries.end(), [this](const FileSystemEntry* a, const FileSystemEntry* b) {
         return compareEntries(a, b);

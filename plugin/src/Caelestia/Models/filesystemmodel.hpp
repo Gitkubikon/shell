@@ -3,7 +3,6 @@
 #include <qabstractitemmodel.h>
 #include <qdir.h>
 #include <qfilesystemwatcher.h>
-#include <qhash.h>
 #include <qfuture.h>
 #include <qimagereader.h>
 #include <qmimedatabase.h>
@@ -28,15 +27,12 @@ class FileSystemEntry : public QObject {
     Q_PROPERTY(bool isDir READ isDir CONSTANT)
     Q_PROPERTY(bool isImage READ isImage CONSTANT)
     Q_PROPERTY(QString mimeType READ mimeType CONSTANT)
-    Q_PROPERTY(QString previewPath READ previewPath CONSTANT)
 
 public:
-    explicit FileSystemEntry(
-        const QString& path, const QString& relativePath, const QString& previewPath, QObject* parent = nullptr);
+    explicit FileSystemEntry(const QString& path, const QString& relativePath, QObject* parent = nullptr);
 
     [[nodiscard]] QString path() const;
     [[nodiscard]] QString relativePath() const;
-    [[nodiscard]] QString previewPath() const;
     [[nodiscard]] QString name() const;
     [[nodiscard]] QString baseName() const;
     [[nodiscard]] QString parentDir() const;
@@ -56,7 +52,6 @@ private:
 
     const QString m_path;
     QString m_relativePath;
-    const QString m_previewPath;
 
     mutable bool m_isImage;
     mutable bool m_isImageInitialised;
@@ -131,7 +126,7 @@ private:
     QDir m_dir;
     QFileSystemWatcher m_watcher;
     QList<FileSystemEntry*> m_entries;
-    QHash<QString, QFuture<QPair<QSet<QString>, QHash<QString, QString>>>> m_futures;
+    QHash<QString, QFuture<QPair<QSet<QString>, QSet<QString>>>> m_futures;
 
     QString m_path;
     bool m_recursive;
@@ -146,7 +141,7 @@ private:
     void updateWatcher();
     void updateEntries();
     void updateEntriesForDir(const QString& dir);
-    void applyChanges(const QSet<QString>& removedPaths, const QHash<QString, QString>& addedPaths);
+    void applyChanges(const QSet<QString>& removedPaths, const QSet<QString>& addedPaths);
     [[nodiscard]] bool compareEntries(const FileSystemEntry* a, const FileSystemEntry* b) const;
 };
 

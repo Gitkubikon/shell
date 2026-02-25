@@ -13,9 +13,6 @@ Item {
     required property FileSystemEntry modelData
     required property PersistentProperties visibilities
 
-    // Play the animated wallpaper preview?
-    property bool animatePreview: false
-
     scale: 0.5
     opacity: 0
     z: PathView.z ?? 0
@@ -32,7 +29,7 @@ Item {
         radius: Appearance.rounding.normal
 
         function onClicked(): void {
-            Wallpapers.setWallpaper(root.modelData.path, root.modelData.previewPath);
+            Wallpapers.setWallpaper(root.modelData.path);
             root.visibilities.launcher = false;
         }
     }
@@ -68,10 +65,9 @@ Item {
         }
 
         CachingImage {
-            path: root.modelData.previewPath || root.modelData.path
+            path: root.modelData.path
             smooth: !root.PathView.view.moving
-            preferAnimated: root.animatePreview
-            playbackEnabled: root.animatePreview
+            cache: true
 
             anchors.fill: parent
         }
