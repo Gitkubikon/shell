@@ -8,6 +8,42 @@ import QtQuick.Layouts
 StyledRect {
     id: root
 
+    readonly property int tempMin: 1200
+    readonly property int tempMax: 6500
+    readonly property string scheduleText: formatSchedule(Config.services.nightLight.from, Config.services.nightLight.to)
+
+    function formatTimeString(timeString: string): string {
+        if (typeof timeString !== "string")
+            return "";
+
+        const parts = timeString.split(":");
+        const hour = Number(parts[0]);
+        const minute = Number(parts[1]);
+        if (!Number.isFinite(hour) || !Number.isFinite(minute))
+            return "";
+
+        const d = new Date();
+        d.setHours(hour, minute, 0, 0);
+        return Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm");
+    }
+
+    function formatSchedule(fromString: string, toString: string): string {
+        const fromFormatted = formatTimeString(fromString);
+        const toFormatted = formatTimeString(toString);
+        if (fromFormatted.length && toFormatted.length)
+            return `${fromFormatted} - ${toFormatted}`;
+        return `${fromString} - ${toString}`;
+    }
+
+    function sliderToTemp(value: real): int {
+        return Math.round(root.tempMax - (value * (root.tempMax - root.tempMin)));
+    }
+
+    function tempToSlider(temp: int): real {
+        const clamped = Math.max(root.tempMin, Math.min(root.tempMax, temp));
+        return (root.tempMax - clamped) / (root.tempMax - root.tempMin);
+    }
+
     Layout.fillWidth: true
     implicitHeight: layout.implicitHeight + Appearance.padding.large * 2
 
@@ -56,80 +92,56 @@ StyledRect {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: Hyprsunset.active ? qsTr("Active • %1K").arg(Config.services.nightLight.colorTemperature) : qsTr("Screen at normal temperature")
+                    text: qsTr("%1 - %2K - %3")
+                        .arg(Hyprsunset.active ? qsTr("Active now") : qsTr("Off"))
+                        .arg(Config.services.nightLight.colorTemperature)
+                        .arg(root.scheduleText)
                     color: Colours.palette.m3onSurfaceVariant
                     font.pointSize: Appearance.font.size.small
                     elide: Text.ElideRight
                 }
             }
 
-            StyledSwitch {
-                checked: Hyprsunset.active
-                onToggled: Hyprsunset.toggle(checked)
+        }
+
+        StyledSlider {
+            Layout.fillWidth: true
+            Layout.topMargin: Appearance.spacing.small
+            implicitHeight: Appearance.padding.normal * 3
+
+            from: 0
+            to: 1
+            value: root.tempToSlider(Config.services.nightLight.colorTemperature)
+            onMoved: {
+                const temp = root.sliderToTemp(value);
+                Config.services.nightLight.colorTemperature = temp;
+                if (temp >= root.tempMax) {
+                    if (Hyprsunset.active)
+                        Hyprsunset.toggle(false);
+                } else if (!Hyprsunset.active) {
+                    Hyprsunset.toggle(true);
+                }
             }
         }
 
-        ColumnLayout {
+        RowLayout {
             Layout.fillWidth: true
-            visible: Hyprsunset.active
-            spacing: Appearance.spacing.small
+            Layout.topMargin: -Appearance.spacing.small
 
-            opacity: Hyprsunset.active ? 1 : 0
-
-            Behavior on opacity {
-                Anim {}
+            StyledText {
+                text: `${root.tempMax}K`
+                color: Colours.palette.m3outline
+                font.pointSize: Appearance.font.size.smaller
             }
 
-            RowLayout {
+            Item {
                 Layout.fillWidth: true
-
-                StyledText {
-                    text: qsTr("Temperature")
-                    font.pointSize: Appearance.font.size.small
-                    color: Colours.palette.m3onSurfaceVariant
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                StyledText {
-                    text: `${Config.services.nightLight.colorTemperature}K`
-                    font.pointSize: Appearance.font.size.small
-                    color: Colours.palette.m3primary
-                    font.weight: 500
-                }
             }
 
-            StyledSlider {
-                Layout.fillWidth: true
-                Layout.topMargin: -Appearance.spacing.small
-
-                from: 1200
-                to: 6500
-                value: Config.services.nightLight.colorTemperature
-                onMoved: Config.services.nightLight.colorTemperature = value
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: -Appearance.spacing.small
-
-                StyledText {
-                    text: qsTr("Warm")
-                    color: Colours.palette.m3outline
-                    font.pointSize: Appearance.font.size.smaller
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                StyledText {
-                    text: qsTr("Cool")
-                    color: Colours.palette.m3outline
-                    font.pointSize: Appearance.font.size.smaller
-                }
+            StyledText {
+                text: `${root.tempMin}K`
+                color: Colours.palette.m3outline
+                font.pointSize: Appearance.font.size.smaller
             }
         }
 

@@ -24,9 +24,9 @@ JsonObject {
     property NightLightConfig nightLight: NightLightConfig {}
 
     component NightLightConfig: JsonObject {
-        property bool automatic: false
-        property string from: "19:00"
-        property string to: "06:30"
+        property bool automatic: true
+        property string from: "20:00"
+        property string to: "08:00"
         property int colorTemperature: 4500
     }
 }

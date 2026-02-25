@@ -50,8 +50,9 @@
       in
         pkgs.mkShell.override {stdenv = shell.stdenv;} {
           inputsFrom = [shell shell.plugin shell.extras];
-          packages = with pkgs; [clazy material-symbols rubik nerd-fonts.caskaydia-cove];
+          packages = with pkgs; [clazy material-symbols rubik nerd-fonts.caskaydia-cove qt6.qt5compat];
           CAELESTIA_XKB_RULES_PATH = "${pkgs.xkeyboard-config}/share/xkeyboard-config-2/rules/base.lst";
+          QML2_IMPORT_PATH = "${pkgs.qt6.qt5compat}/${pkgs.qt6.qtbase.qtQmlPrefix}";
         };
     });
 

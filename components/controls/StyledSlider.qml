@@ -41,9 +41,10 @@ Slider {
 
     handle: StyledRect {
         x: root.visualPosition * root.availableWidth - implicitWidth / 2
+        y: (root.height - implicitHeight) / 2
 
-        implicitWidth: root.implicitHeight / 4.5
-        implicitHeight: root.implicitHeight
+        implicitWidth: root.implicitHeight * 0.6
+        implicitHeight: root.implicitHeight * 0.6
 
         color: Colours.palette.m3primary
         radius: Appearance.rounding.full

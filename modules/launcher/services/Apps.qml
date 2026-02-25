@@ -73,5 +73,6 @@ Searcher {
 
         path: `${Paths.state}/apps.sqlite`
         entries: DesktopEntries.applications.values.filter(a => !Config.launcher.hiddenApps.includes(a.id))
+        favouriteApps: []
     }
 }
