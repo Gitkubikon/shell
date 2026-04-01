@@ -15,22 +15,6 @@ JsonObject {
     property UseFuzzy useFuzzy: UseFuzzy {}
     property Sizes sizes: Sizes {}
 
-    component UseFuzzy: JsonObject {
-        property bool apps: false
-        property bool actions: false
-        property bool schemes: false
-        property bool variants: false
-        property bool wallpapers: false
-        property bool vpn: false
-    }
-
-    component Sizes: JsonObject {
-        property int itemWidth: 600
-        property int itemHeight: 57
-        property int wallpaperWidth: 280
-        property int wallpaperHeight: 200
-    }
-
     property list<var> actions: [
         {
             name: "Config",
@@ -169,4 +153,20 @@ JsonObject {
             dangerous: false
         }
     ]
+
+    component UseFuzzy: JsonObject {
+        property bool apps: false
+        property bool actions: false
+        property bool schemes: false
+        property bool variants: false
+        property bool wallpapers: false
+        property bool vpn: false
+    }
+
+    component Sizes: JsonObject {
+        property int itemWidth: 600
+        property int itemHeight: 57
+        property int wallpaperWidth: 280
+        property int wallpaperHeight: 200
+    }
 }

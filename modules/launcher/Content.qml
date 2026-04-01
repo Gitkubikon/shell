@@ -1,17 +1,16 @@
 pragma ComponentBehavior: Bound
 
-import "services"
+import QtQuick
 import qs.components
 import qs.components.controls
 import qs.services
 import qs.config
-import Quickshell
-import QtQuick
+import qs.modules.launcher.services
 
 Item {
     id: root
 
-    required property PersistentProperties visibilities
+    required property DrawerVisibilities visibilities
     required property var panels
     required property real maxHeight
 
@@ -132,10 +131,10 @@ Item {
                     return;
 
                 if (event.modifiers & Qt.ControlModifier) {
-                    if (event.key === Qt.Key_J) {
+                    if (event.key === Qt.Key_J || event.key === Qt.Key_N) {
                         list.currentList?.incrementCurrentIndex();
                         event.accepted = true;
-                    } else if (event.key === Qt.Key_K) {
+                    } else if (event.key === Qt.Key_K || event.key === Qt.Key_P) {
                         list.currentList?.decrementCurrentIndex();
                         event.accepted = true;
                     }
@@ -151,8 +150,6 @@ Item {
             Component.onCompleted: forceActiveFocus()
 
             Connections {
-                target: root.visibilities
-
                 function onLauncherChanged(): void {
                     if (!root.visibilities.launcher) {
                         search.text = "";
@@ -172,6 +169,8 @@ Item {
                     if (!root.visibilities.session)
                         search.forceActiveFocus();
                 }
+
+                target: root.visibilities
             }
         }
 

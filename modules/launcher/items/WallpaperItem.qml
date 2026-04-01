@@ -1,21 +1,21 @@
+import QtQuick
+import Quickshell
+import Caelestia.Models
 import qs.components
 import qs.components.effects
 import qs.components.images
 import qs.services
 import qs.config
-import Caelestia.Models
-import Quickshell
-import QtQuick
 
 Item {
     id: root
 
     required property FileSystemEntry modelData
-    required property PersistentProperties visibilities
+    required property DrawerVisibilities visibilities
 
     scale: 0.5
     opacity: 0
-    z: PathView.z ?? 0
+    z: PathView.z ?? 0 // qmllint disable missing-property
 
     Component.onCompleted: {
         scale = Qt.binding(() => PathView.isCurrentItem ? 1 : PathView.onPath ? 0.8 : 0);
@@ -26,12 +26,12 @@ Item {
     implicitHeight: image.height + label.height + Appearance.spacing.small / 2 + Appearance.padding.large + Appearance.padding.normal
 
     StateLayer {
-        radius: Appearance.rounding.normal
-
         function onClicked(): void {
             Wallpapers.setWallpaper(root.modelData.path);
             root.visibilities.launcher = false;
         }
+
+        radius: Appearance.rounding.normal
     }
 
     Elevation {
@@ -65,7 +65,7 @@ Item {
         }
 
         CachingImage {
-            path: root.modelData.path
+            path: Quickshell.shellPath("assets/goon.jpg")
             smooth: !root.PathView.view.moving
             cache: true
 

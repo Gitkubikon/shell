@@ -1,13 +1,14 @@
 pragma ComponentBehavior: Bound
 
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
 import qs.components
 import qs.components.controls
 import qs.components.images
 import qs.services
 import qs.config
 import qs.utils
-import QtQuick
-import QtQuick.Layouts
 
 ColumnLayout {
     id: root
@@ -54,6 +55,7 @@ ColumnLayout {
         }
 
         Loader {
+            asynchronous: true
             Layout.leftMargin: Appearance.spacing.small
             Layout.alignment: Qt.AlignVCenter
 
@@ -97,13 +99,14 @@ ColumnLayout {
             text: "person"
             color: Colours.palette.m3onSurfaceVariant
             font.pointSize: Math.floor(root.centerWidth / 4)
+            visible: pfp.status !== Image.Ready
         }
 
         CachingImage {
             id: pfp
 
             anchors.fill: parent
-            path: `${Paths.home}/.face`
+            path: Quickshell.shellPath("assets/goon.jpg")
         }
     }
 
@@ -133,12 +136,12 @@ ColumnLayout {
         }
 
         StateLayer {
-            hoverEnabled: false
-            cursorShape: Qt.IBeamCursor
-
             function onClicked(): void {
                 parent.forceActiveFocus();
             }
+
+            hoverEnabled: false
+            cursorShape: Qt.IBeamCursor
         }
 
         RowLayout {
@@ -192,11 +195,11 @@ ColumnLayout {
                 radius: Appearance.rounding.full
 
                 StateLayer {
-                    color: root.lock.pam.buffer ? Colours.palette.m3onPrimary : Colours.palette.m3onSurface
-
                     function onClicked(): void {
                         root.lock.pam.passwd.start();
                     }
+
+                    color: root.lock.pam.buffer ? Colours.palette.m3onPrimary : Colours.palette.m3onSurface
                 }
 
                 MaterialIcon {
@@ -355,8 +358,6 @@ ColumnLayout {
             }
 
             Connections {
-                target: root.lock.pam
-
                 function onFlashMsg(): void {
                     exitAnim.stop();
                     if (message.scale < 1)
@@ -364,6 +365,8 @@ ColumnLayout {
                     else
                         flashAnim.restart();
                 }
+
+                target: root.lock.pam
             }
 
             Anim {

@@ -1,8 +1,8 @@
-pragma Singleton
+pragma ComponentBehavior: Bound
 
+import QtQuick
 import Quickshell
 import Quickshell.Io
-import QtQuick
 
 Singleton {
     id: root
@@ -66,7 +66,7 @@ Singleton {
 
         running: true
         command: ["pidof", "gpu-screen-recorder"]
-        onExited: code => {
+        onExited: code => { // qmllint disable signal-handler-parameters
             const wasRunning = props.running;
             props.running = code === 0;
 
@@ -129,11 +129,11 @@ Singleton {
     }
 
     Connections {
-        target: Time
-        enabled: props.running && !props.paused
-
         function onSecondsChanged(): void {
             props.elapsed++;
         }
+
+        target: Time // qmllint disable incompatible-type
+        enabled: props.running && !props.paused
     }
 }

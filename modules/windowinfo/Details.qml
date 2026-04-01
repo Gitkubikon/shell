@@ -1,10 +1,10 @@
+import QtQuick
+import QtQuick.Layouts
+import Quickshell.Hyprland
 import qs.components
 import qs.services
 import qs.utils
 import qs.config
-import Quickshell.Hyprland
-import QtQuick
-import QtQuick.Layouts
 
 ColumnLayout {
     id: root

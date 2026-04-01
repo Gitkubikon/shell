@@ -3,8 +3,7 @@ pragma ComponentBehavior: Bound
 import qs.components
 import qs.components.controls
 import qs.components.effects
-import qs.services // for Colours
-import qs.services as Services
+import qs.services
 import qs.config
 import QtQuick
 import QtQuick.Controls
@@ -16,21 +15,21 @@ import "calendar_layout.js" as CalendarLayout
 Item {
     id: root
 
-    required property var state
+    required property DashboardState dashState
 
     readonly property int firstDay: {
         const cfg = Config.services && Config.services.calendarFirstDayOfWeek;
         const value = Math.max(0, Math.min(6, cfg === undefined || cfg === null ? 0 : cfg));
         return value;
     }
-    readonly property date viewDate: state?.currentDate
-                                      ? new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), 1)
+    readonly property date viewDate: dashState?.currentDate
+                                      ? new Date(dashState.currentDate.getFullYear(), dashState.currentDate.getMonth(), 1)
                                       : new Date()
     readonly property var calendarLayout: buildCalendar(viewDate, isCurrentMonth(viewDate), firstDay)
-    readonly property var selectedEvents: Services.Calendar.eventsOn(state?.currentDate ?? new Date())
+    readonly property var selectedEvents: Calendar.eventsOn(dashState?.currentDate ?? new Date())
                                               .sort((a, b) => a.startDate - b.startDate)
     property bool overlayVisible: false
-    property date overlayDate: state?.currentDate ?? new Date()
+    property date overlayDate: dashState?.currentDate ?? new Date()
     property var overlayEvents: []
     readonly property real gridSpacing: Appearance.spacing.smaller
     readonly property int gridRows: Math.max(1, calendarLayout ? calendarLayout.length : 6)
@@ -58,16 +57,16 @@ Item {
         target: null
         onWheel: event => {
             if (event.angleDelta.y > 0)
-                root.state.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+                root.dashState.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
             else if (event.angleDelta.y < 0)
-                root.state.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+                root.dashState.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
         }
     }
 
     TapHandler {
         acceptedButtons: Qt.MiddleButton
         onTapped: {
-            root.state.currentDate = new Date();
+            root.dashState.currentDate = new Date();
         }
     }
 
@@ -118,52 +117,52 @@ Item {
 
     function toDate(cell) {
         if (!cell || cell.day === "" || cell.year === undefined || cell.month === undefined)
-            return state?.currentDate ?? new Date();
+            return dashState?.currentDate ?? new Date();
         return new Date(cell.year, cell.month, cell.day);
     }
 
-        function openEventsOverlay(cellItem) {
-            const targetCell = cellItem && cellItem.safeCell ? cellItem.safeCell : null;
-            const targetDate = targetCell ? toDate(targetCell) : state?.currentDate ?? new Date();
+    function openEventsOverlay(cellItem) {
+        const targetCell = cellItem && cellItem.safeCell ? cellItem.safeCell : null;
+        const targetDate = targetCell ? toDate(targetCell) : dashState?.currentDate ?? new Date();
 
-            if (!state?.currentDate) {
-                state.currentDate = targetDate;
-            }
-
-            if (targetCell && targetCell.day !== "") {
-                state.currentDate = targetDate;
-            }
-
-            // Reset and repopulate overlay data to avoid stale/mingled entries
-            overlayVisible = false;
-            overlayEvents = [];
-            overlayDate = new Date(targetDate);
-            overlayEvents = Services.Calendar.eventsOn(targetDate)
-                                    .map(e => ({
-                                        title: e.title,
-                                        content: e.content,
-                                        summary: e.summary,
-                                        startDate: e.startDate,
-                                        endDate: e.endDate,
-                                        startIso: e.startIso,
-                                        endIso: e.endIso,
-                                        color: e.color
-                                    }))
-                                    .sort((a, b) => a.startDate - b.startDate);
-            overlayVisible = true;
+        if (!dashState?.currentDate) {
+            dashState.currentDate = targetDate;
         }
 
-        Item {
-            id: calendarBody
+        if (targetCell && targetCell.day !== "") {
+            dashState.currentDate = targetDate;
+        }
+
+        // Reset and repopulate overlay data to avoid stale/mingled entries
+        overlayVisible = false;
+        overlayEvents = [];
+        overlayDate = new Date(targetDate);
+        overlayEvents = Calendar.eventsOn(targetDate)
+                                .map(e => ({
+                                    title: e.title,
+                                    content: e.content,
+                                    summary: e.summary,
+                                    startDate: e.startDate,
+                                    endDate: e.endDate,
+                                    startIso: e.startIso,
+                                    endIso: e.endIso,
+                                    color: e.color
+                                }))
+                                .sort((a, b) => a.startDate - b.startDate);
+        overlayVisible = true;
+    }
+
+    Item {
+        id: calendarBody
+
+        anchors.fill: parent
+
+        ColumnLayout {
+            id: content
 
             anchors.fill: parent
-
-            ColumnLayout {
-                id: content
-
-                anchors.fill: parent
-                anchors.margins: Appearance.padding.large
-                spacing: Appearance.spacing.normal
+            anchors.margins: Appearance.padding.large
+            spacing: Appearance.spacing.normal
 
             RowLayout {
                 id: monthRow
@@ -180,7 +179,7 @@ Item {
 
                         radius: Appearance.rounding.full
                         function onClicked() {
-                            root.state.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+                            root.dashState.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
                         }
                     }
 
@@ -211,7 +210,7 @@ Item {
                         disabled: isCurrentMonth(viewDate)
 
                         function onClicked() {
-                            root.state.currentDate = new Date();
+                            root.dashState.currentDate = new Date();
                         }
                     }
                 }
@@ -225,7 +224,7 @@ Item {
 
                         radius: Appearance.rounding.full
                         function onClicked() {
-                            root.state.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+                            root.dashState.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
                         }
                     }
 
@@ -414,11 +413,11 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        visible: Services.Calendar.loading || !Services.Calendar.khalAvailable
+                        visible: Calendar.loading || !Calendar.khalAvailable
                         spacing: Appearance.spacing.smaller
 
                         BusyIndicator {
-                            visible: Services.Calendar.loading
+                            visible: Calendar.loading
                             running: visible
                             width: 18
                             height: 18
@@ -428,14 +427,14 @@ Item {
                             text: qsTr("Refreshing events…")
                             color: Colours.palette.m3onSurfaceVariant
                             font.weight: 600
-                            visible: Services.Calendar.loading
+                            visible: Calendar.loading
                         }
 
                         StyledText {
-                            text: Services.Calendar.errorMessage || qsTr("Calendar backend not available")
+                            text: Calendar.errorMessage || qsTr("Calendar backend not available")
                             color: Colours.palette.m3error
                             font.weight: 600
-                            visible: !Services.Calendar.khalAvailable
+                            visible: !Calendar.khalAvailable
                         }
 
                         Item { Layout.fillWidth: true }
@@ -445,13 +444,15 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
-                        sourceComponent: !Services.Calendar.khalAvailable
+                        sourceComponent: !Calendar.khalAvailable
                                            ? backendErrorComponent
                                            : (overlayEvents.length === 0 ? overlayEmptyComponent : overlayEventsListComponent)
                     }
                 }
             }
         }
+    }
+
     Component {
         id: backendErrorComponent
 
@@ -460,7 +461,7 @@ Item {
 
             StyledText {
                 anchors.centerIn: parent
-                text: Services.Calendar.errorMessage || qsTr("Install/configure Caelestia calendar to show events")
+                text: Calendar.errorMessage || qsTr("Install/configure Caelestia calendar to show events")
                 color: Colours.palette.m3error
                 font.weight: 600
                 wrapMode: Text.Wrap
@@ -477,7 +478,7 @@ Item {
 
             StyledText {
                 anchors.centerIn: parent
-                text: Services.Calendar.loading ? qsTr("Loading events…") : qsTr("No events for this day")
+                text: Calendar.loading ? qsTr("Loading events…") : qsTr("No events for this day")
                 color: Colours.palette.m3onSurfaceVariant
                 font.weight: 600
                 wrapMode: Text.Wrap
@@ -486,100 +487,99 @@ Item {
         }
     }
 
-        Component {
-            id: overlayEventsListComponent
+    Component {
+        id: overlayEventsListComponent
 
-            ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                ScrollBar.vertical.policy: ScrollBar.AsNeeded
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-                ColumnLayout {
-                    id: eventsColumn
+            ColumnLayout {
+                id: eventsColumn
 
-                    width: parent.width - Appearance.padding.normal
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: Appearance.spacing.small
+                width: parent.width - Appearance.padding.normal
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: Appearance.spacing.small
 
-                    Repeater {
-                        model: overlayEvents ? overlayEvents.slice(0) : []
+                Repeater {
+                    model: overlayEvents ? overlayEvents.slice(0) : []
 
-                        delegate: StyledRect {
-                            required property var modelData
+                    delegate: StyledRect {
+                        required property var modelData
 
-                            Layout.fillWidth: true
-                            implicitHeight: innerRow.implicitHeight + Appearance.padding.small * 2
-                            radius: Appearance.rounding.small
-                            color: Colours.palette.m3surfaceContainerHighest
+                        Layout.fillWidth: true
+                        implicitHeight: innerRow.implicitHeight + Appearance.padding.small * 2
+                        radius: Appearance.rounding.small
+                        color: Colours.palette.m3surfaceContainerHighest
 
-                            RowLayout {
-                                id: innerRow
-                                anchors.fill: parent
-                                anchors.margins: Appearance.padding.small
-                                spacing: Appearance.spacing.small
+                        RowLayout {
+                            id: innerRow
+                            anchors.fill: parent
+                            anchors.margins: Appearance.padding.small
+                            spacing: Appearance.spacing.small
 
-                                // Color Indicator Strip
-                                Rectangle {
-                                    Layout.fillHeight: true
-                                    Layout.preferredWidth: 4
-                                    radius: 2
-                                    color: modelData.color || Colours.palette.m3primary
-                                    opacity: 0.9
+                            // Color Indicator Strip
+                            Rectangle {
+                                Layout.fillHeight: true
+                                Layout.preferredWidth: 4
+                                radius: 2
+                                color: modelData.color || Colours.palette.m3primary
+                                opacity: 0.9
+                            }
+
+                            // Content Column
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: {
+                                        if (modelData && modelData.title && modelData.title.length) return modelData.title;
+                                        if (modelData && modelData.summary && modelData.summary.length) return modelData.summary;
+                                        return qsTr("Untitled event");
+                                    }
+                                    wrapMode: Text.Wrap
+                                    color: Colours.palette.m3onSurface
+                                    font.weight: 600
+                                    font.pointSize: Appearance.font.size.normal
                                 }
 
-                                // Content Column
-                                ColumnLayout {
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    spacing: 0
+                                    spacing: 4
 
                                     StyledText {
-                                        Layout.fillWidth: true
                                         text: {
-                                            if (modelData && modelData.title && modelData.title.length) return modelData.title;
-                                            if (modelData && modelData.summary && modelData.summary.length) return modelData.summary;
-                                            return qsTr("Untitled event");
+                                            const d = modelData && modelData.startDate ? new Date(modelData.startDate) : null;
+                                            return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
                                         }
-                                        wrapMode: Text.Wrap
-                                        color: Colours.palette.m3onSurface
-                                        font.weight: 600
-                                        font.pointSize: Appearance.font.size.normal
+                                        font.weight: 500
+                                        font.pointSize: Appearance.font.size.smaller
+                                        color: Colours.palette.m3onSurfaceVariant
                                     }
 
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 4
-
-                                        StyledText {
-                                            text: {
-                                                const d = modelData && modelData.startDate ? new Date(modelData.startDate) : null;
-                                                return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
-                                            }
-                                            font.weight: 500
-                                            font.pointSize: Appearance.font.size.smaller
-                                            color: Colours.palette.m3onSurfaceVariant
-                                        }
-
-                                        StyledText {
-                                            text: "-"
-                                            visible: timeEnd.visible
-                                            font.pointSize: Appearance.font.size.smaller
-                                            color: Colours.palette.m3onSurfaceVariant
-                                        }
-
-                                        StyledText {
-                                            id: timeEnd
-                                            text: {
-                                                const d = modelData && modelData.endDate ? new Date(modelData.endDate) : null;
-                                                return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
-                                            }
-                                            font.pointSize: Appearance.font.size.smaller
-                                            color: Colours.palette.m3onSurfaceVariant
-                                            visible: modelData.endDate && modelData.startDate && modelData.endDate !== modelData.startDate
-                                        }
-
-                                        Item { Layout.fillWidth: true }
+                                    StyledText {
+                                        text: "-"
+                                        visible: timeEnd.visible
+                                        font.pointSize: Appearance.font.size.smaller
+                                        color: Colours.palette.m3onSurfaceVariant
                                     }
+
+                                    StyledText {
+                                        id: timeEnd
+                                        text: {
+                                            const d = modelData && modelData.endDate ? new Date(modelData.endDate) : null;
+                                            return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
+                                        }
+                                        font.pointSize: Appearance.font.size.smaller
+                                        color: Colours.palette.m3onSurfaceVariant
+                                        visible: modelData.endDate && modelData.startDate && modelData.endDate !== modelData.startDate
+                                    }
+
+                                    Item { Layout.fillWidth: true }
                                 }
                             }
                         }
@@ -587,12 +587,14 @@ Item {
                 }
             }
         }
+    }
+
     component DayCell: Item {
         id: dayCell
 
         required property var cell
 
-        readonly property date currentDateVal: state?.currentDate ?? new Date()
+        readonly property date currentDateVal: dashState?.currentDate ?? new Date()
         readonly property date todayMidnight: {
             const d = new Date();
             d.setHours(0, 0, 0, 0);
@@ -622,93 +624,93 @@ Item {
         }
         readonly property var events: safeCell.day === ""
                                       ? []
-                                      : Services.Calendar.eventsOn(toDate(safeCell))
+                                      : Calendar.eventsOn(toDate(safeCell))
         readonly property color eventColor: dayCell.events.length > 0
                                             ? (dayCell.events[0]?.color || Colours.palette.m3primary)
                                             : Colours.palette.m3primary
         readonly property bool isPast: dayCell.temporalState < 0
 
-                implicitWidth: root.cellSize
-                implicitHeight: root.cellSize
+        implicitWidth: root.cellSize
+        implicitHeight: root.cellSize
 
-                StyledRect {
-                    id: bg
-                    anchors.fill: parent
-                    anchors.margins: 2
-                    radius: Appearance.rounding.small
+        StyledRect {
+            id: bg
+            anchors.fill: parent
+            anchors.margins: 2
+            radius: Appearance.rounding.small
 
+            color: dayCell.isSelected
+                       ? Colours.palette.m3primaryContainer
+                       : (dayCell.isToday
+                              ? Colours.layer(Colours.palette.m3secondaryContainer, 0.3)
+                              : "transparent")
+
+            border.width: (dayCell.isToday && !dayCell.isSelected) ? 1 : 0
+            border.color: Colours.palette.m3primary
+
+            opacity: (!dayCell.isSelected && !dayCell.isToday && dayCell.isPast) ? 0.5 : 1
+
+            Item {
+                anchors.fill: parent
+                anchors.margins: Appearance.padding.small
+
+                Text {
+                    anchors.centerIn: parent
+                    text: `${safeCell.day}`
+                    font.weight: (dayCell.isSelected || dayCell.isToday) ? Font.Bold : Font.Normal
                     color: dayCell.isSelected
-                               ? Colours.palette.m3primaryContainer
-                               : (dayCell.isToday
-                                      ? Colours.layer(Colours.palette.m3secondaryContainer, 0.3)
-                                      : "transparent")
+                           ? Colours.palette.m3onPrimaryContainer
+                           : (dayCell.isToday
+                                  ? Colours.palette.m3primary
+                                  : (dayCell.inMonth
+                                         ? Colours.palette.m3onSurface
+                                         : Colours.palette.m3onSurfaceVariant))
+                    font.pointSize: Appearance.font.size.normal
+                }
+            }
 
-                    border.width: (dayCell.isToday && !dayCell.isSelected) ? 1 : 0
-                    border.color: Colours.palette.m3primary
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 4
+                spacing: 3
+                visible: dayCell.events.length > 0
 
-                    opacity: (!dayCell.isSelected && !dayCell.isToday && dayCell.isPast) ? 0.5 : 1
+                property int maxDots: 4
+                property int dotCount: Math.min(maxDots, dayCell.events.length)
 
-                    Item {
-                        anchors.fill: parent
-                        anchors.margins: Appearance.padding.small
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: `${safeCell.day}`
-                            font.weight: (dayCell.isSelected || dayCell.isToday) ? Font.Bold : Font.Normal
-                            color: dayCell.isSelected
-                                   ? Colours.palette.m3onPrimaryContainer
-                                   : (dayCell.isToday
-                                          ? Colours.palette.m3primary
-                                          : (dayCell.inMonth
-                                                 ? Colours.palette.m3onSurface
-                                                 : Colours.palette.m3onSurfaceVariant))
-                            font.pointSize: Appearance.font.size.normal
-                        }
-                    }
-
-                    Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 4
-                        spacing: 3
-                        visible: dayCell.events.length > 0
-
-                        property int maxDots: 4
-                        property int dotCount: Math.min(maxDots, dayCell.events.length)
-
-                        Repeater {
-                            model: parent.dotCount
-                            Rectangle {
-                                width: 4
-                                height: 4
-                                radius: 2
-                                color: dayCell.isSelected
-                                       ? Colours.palette.m3onPrimaryContainer
-                                       : (dayCell.events[index]?.color || Colours.palette.m3primary)
-                            }
-                        }
-                    }
-
-                    HoverHandler {
-                        id: hover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
+                Repeater {
+                    model: parent.dotCount
                     Rectangle {
-                        anchors.fill: parent
-                        radius: parent.radius
-                        color: Colours.palette.m3onSurface
-                        opacity: hover.hovered ? 0.05 : 0
+                        width: 4
+                        height: 4
+                        radius: 2
+                        color: dayCell.isSelected
+                               ? Colours.palette.m3onPrimaryContainer
+                               : (dayCell.events[index]?.color || Colours.palette.m3primary)
                     }
+                }
+            }
 
-                    TapHandler {
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-                        onTapped: {
-                            const dt = toDate(safeCell);
-                            openEventsOverlay(dayCell);
-                        }
-                    }
-                }    }
-}
+            HoverHandler {
+                id: hover
+                cursorShape: Qt.PointingHandCursor
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                color: Colours.palette.m3onSurface
+                opacity: hover.hovered ? 0.05 : 0
+            }
+
+            TapHandler {
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                onTapped: {
+                    const dt = toDate(safeCell);
+                    openEventsOverlay(dayCell);
+                }
+            }
+        }
+    }
 }
