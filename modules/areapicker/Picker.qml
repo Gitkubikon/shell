@@ -162,6 +162,7 @@ MouseArea {
         if (root.loader.freeze) {
             save();
         } else {
+            root.loader.closing = true;
             overlay.visible = border.visible = false;
             screencopy.visible = false;
             screencopy.active = true;
@@ -233,6 +234,7 @@ MouseArea {
 
         sourceComponent: ScreencopyView {
             captureSource: root.screen
+            paintCursor: false
 
             onHasContentChanged: hasContent && !root.loader.freeze && (overlay.visible = border.visible = true, root.save())
         }

@@ -17,8 +17,8 @@ Singleton {
 
     readonly property string icon: cc ? Icons.getWeatherIcon(cc.weatherCode) : "cloud_alert"
     readonly property string description: cc?.weatherDesc ?? qsTr("No weather")
-    readonly property string temp: Config.services.useFahrenheit ? `${cc?.tempF ?? 0}°F` : `${cc?.tempC ?? 0}°C`
-    readonly property string feelsLike: Config.services.useFahrenheit ? `${cc?.feelsLikeF ?? 0}°F` : `${cc?.feelsLikeC ?? 0}°C`
+    readonly property string temp: Config.services.isMetric ? `${cc?.tempC ?? 0}°C` : `${cc?.tempF ?? 0}°F`
+    readonly property string feelsLike: Config.services.isMetric ? `${cc?.feelsLikeC ?? 0}°C` : `${cc?.feelsLikeF ?? 0}°F`
     readonly property int humidity: cc?.humidity ?? 0
     readonly property real windSpeed: cc?.windSpeed ?? 0
     readonly property string sunrise: cc ? Qt.formatDateTime(new Date(cc.sunrise), Config.services.useTwelveHourClock ? "h:mm A" : "h:mm") : "--:--"

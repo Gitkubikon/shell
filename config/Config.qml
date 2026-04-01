@@ -442,8 +442,7 @@ Singleton {
     function serializeServices(): var {
         return {
             weatherLocation: services.weatherLocation,
-            useFahrenheit: services.useFahrenheit,
-            useFahrenheitPerformance: services.useFahrenheitPerformance,
+            isMetric: services.isMetric,
             useTwelveHourClock: services.useTwelveHourClock,
             gpuType: services.gpuType,
             visualiserBars: services.visualiserBars,
