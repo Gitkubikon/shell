@@ -27,15 +27,15 @@ Searcher {
     property string actualThumbnail
     property bool previewColourLock
 
-    function setWallpaper(path, thumb) {
+    function setWallpaper(path: string): void {
         actualCurrent = path;
-        actualThumbnail = thumb || currentThumbPath;
+        actualThumbnail = currentThumbPath;
         Quickshell.execDetached(["caelestia", "wallpaper", "-f", path, ...smartArg]);
     }
 
-    function preview(path, thumb) {
+    function preview(path: string): void {
         previewPath = path;
-        previewThumbnail = thumb || "";
+        previewThumbnail = "";
         showPreview = true;
 
         if (Colours.scheme === "dynamic")
@@ -62,7 +62,7 @@ Searcher {
             return root.actualCurrent;
         }
 
-        function set(path: string) {
+        function set(path: string): void {
             root.setWallpaper(path);
         }
 
@@ -77,7 +77,6 @@ Searcher {
         onFileChanged: reload()
         onLoaded: {
             root.actualCurrent = text().trim();
-            root.actualThumbnail = root.currentThumbPath;
             root.previewColourLock = false;
         }
     }
@@ -102,3 +101,8 @@ Searcher {
         }
     }
 }
+ }
+        }
+    }
+}
+
