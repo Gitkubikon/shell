@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import qs.components
 import qs.components.effects
 import qs.components.filedialog

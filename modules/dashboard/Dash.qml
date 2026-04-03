@@ -23,7 +23,7 @@ GridLayout {
 
         radius: Appearance.rounding.large
 
-        User {
+        DashUser {
             id: user
 
             visibilities: root.visibilities
@@ -39,7 +39,7 @@ GridLayout {
 
         radius: Appearance.rounding.large * 1.5
 
-        SmallWeather {}
+        DashWeather {}
     }
 
     Rect {
@@ -49,7 +49,7 @@ GridLayout {
 
         radius: Appearance.rounding.normal
 
-        DateTime {
+        DashDateTime {
             id: dateTime
         }
     }
@@ -63,7 +63,7 @@ GridLayout {
 
         radius: Appearance.rounding.large
 
-        Calendar {
+        DashCalendar {
             id: calendar
 
             dashState: root.dashState
@@ -78,7 +78,7 @@ GridLayout {
 
         radius: Appearance.rounding.normal
 
-        Resources {
+        DashResources {
             id: resources
         }
     }
@@ -92,7 +92,7 @@ GridLayout {
 
         radius: Appearance.rounding.large * 2
 
-        Media {
+        DashMedia {
             id: media
         }
     }

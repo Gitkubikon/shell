@@ -20,18 +20,36 @@ Singleton {
         return alias?.to ?? player.identity;
     }
 
-    function getArtUrl(player: MprisPlayer): string {
-        if (!player)
-            return "";
-        if (player.trackArtUrl)
-            return player.trackArtUrl;
+    // Cache last known art URL per track — browsers send artUrl intermittently
+    property string _cachedArtUrl: ""
+    property string _cachedTrackId: ""
 
-        const url = player.metadata["xesam:url"] ?? "";
-        if (url.startsWith("https://www.youtube.com/watch")) {
+    function getArtUrl(player: MprisPlayer): string {
+        if (!player) return "";
+
+        // Track changed — reset cache
+        const trackId = (player.trackTitle ?? "") + (player.trackArtist ?? "");
+        if (trackId !== _cachedTrackId) {
+            _cachedTrackId = trackId;
+            _cachedArtUrl = "";
+        }
+
+        // Update cache if player provides a new art URL
+        const url = player.trackArtUrl ?? "";
+        if (url.length > 0) {
+            _cachedArtUrl = url;
+        }
+
+        if (_cachedArtUrl.length > 0)
+            return _cachedArtUrl;
+
+        const xesamUrl = player.metadata["xesam:url"] ?? "";
+        if (xesamUrl.startsWith("https://www.youtube.com/watch")) {
             // Fallback for youtube
-            const id = url.match(/[?&]v=([\w-]{11})/)?.[1];
+            const id = xesamUrl.match(/[?&]v=([\w-]{11})/)?.[1];
             return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
         }
+
         return "";
     }
 

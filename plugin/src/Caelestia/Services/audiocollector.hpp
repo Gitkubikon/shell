@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cmath>
+// SPA headers use isnormal/isinf/signbit without std:: prefix, which breaks in C++20
+using std::isinf;
+using std::isnormal;
+using std::signbit;
 #include "service.hpp"
 #include <atomic>
 #include <pipewire/pipewire.h>

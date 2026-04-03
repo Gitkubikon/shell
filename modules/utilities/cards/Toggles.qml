@@ -149,8 +149,8 @@ StyledRect {
                             if (VPN.connected) {
                                 VPN.disconnect();
                             } else {
-                                Quickshell.execDetached(["caelestia", "shell", "launcher", "open", `${Config.launcher.actionPrefix}vpn `]);
                                 root.visibilities.utilities = false;
+                                LauncherControl.openLauncher(root.visibilities, `${Config.launcher.actionPrefix}vpn `);
                             }
                         }
                     }

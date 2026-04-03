@@ -17,78 +17,11 @@ Item {
     readonly property HyprlandMonitor monitor: Hypr.monitorFor(screen)
     readonly property string activeSpecial: (Config.bar.workspaces.perMonitorWorkspaces ? monitor : Hypr.focusedMonitor)?.lastIpcObject.specialWorkspace?.name ?? ""
 
-    layer.enabled: true
-    layer.effect: OpacityMask {
-        maskSource: mask
-    }
-
-    Item {
-        id: mask
-
-        anchors.fill: parent
-        layer.enabled: true
-        visible: false
-
-        Rectangle {
-            anchors.fill: parent
-            radius: Appearance.rounding.full
-
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-
-                GradientStop {
-                    position: 0
-                    color: Qt.rgba(0, 0, 0, 0)
-                }
-                GradientStop {
-                    position: 0.3
-                    color: Qt.rgba(0, 0, 0, 1)
-                }
-                GradientStop {
-                    position: 0.7
-                    color: Qt.rgba(0, 0, 0, 1)
-                }
-                GradientStop {
-                    position: 1
-                    color: Qt.rgba(0, 0, 0, 0)
-                }
-            }
-        }
-
-        Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-
-            radius: Appearance.rounding.full
-            implicitHeight: parent.height / 2
-            opacity: view.contentY > 0 ? 0 : 1
-
-            Behavior on opacity {
-                Anim {}
-            }
-        }
-
-        Rectangle {
-            anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-
-            radius: Appearance.rounding.full
-            implicitHeight: parent.height / 2
-            opacity: view.contentY < view.contentHeight - parent.height + Appearance.padding.small ? 0 : 1
-
-            Behavior on opacity {
-                Anim {}
-            }
-        }
-    }
-
     ListView {
         id: view
 
         anchors.fill: parent
-        spacing: Appearance.spacing.small  // Reduced from normal for compactness
+        spacing: Math.floor(Appearance.spacing.small / 2)
         interactive: false
 
         currentIndex: model.values.findIndex(w => w.name === root.activeSpecial)
@@ -105,18 +38,44 @@ Item {
             })
         }
 
-        // Fixed: Changed to ApplyRange to prevent jumping to bottom
-        preferredHighlightBegin: height * 0.3  // Keep in view but not centered
-        preferredHighlightEnd: height * 0.7
-        highlightRangeMode: ListView.ApplyRange
+        // Disable ListView's built-in highlight animation — we handle it ourselves
+        highlightFollowsCurrentItem: false
+        highlightMoveDuration: 0
 
-        highlightFollowsCurrentItem: true  // Changed to true for smoother behavior
-        highlight: Item {
-            y: view.currentItem?.y ?? 0
-            implicitHeight: (view.currentItem as SpecialWsDelegate)?.size ?? 0
+        highlight: Config.bar.workspaces.activeIndicator ? highlightComp : null
 
-            Behavior on y {
-                Anim {}
+        Component {
+            id: highlightComp
+
+            StyledRect {
+                // Bind to currentItem position manually for proper easing
+                y: view.currentItem?.y ?? 0
+                implicitWidth: Config.bar.sizes.innerWidth - Appearance.padding.small * 2
+                implicitHeight: view.currentItem?.implicitHeight ?? 0
+                radius: Appearance.rounding.full
+                color: Colours.palette.m3primary
+                visible: view.currentIndex >= 0
+
+                Behavior on y {
+                    Anim {
+                        easing.bezierCurve: Appearance.anim.curves.emphasized
+                    }
+                }
+
+                Behavior on implicitHeight {
+                    Anim {
+                        easing.bezierCurve: Appearance.anim.curves.emphasized
+                    }
+                }
+
+                // Scale in on first appearance
+                scale: 0
+                Component.onCompleted: scale = 1
+                Behavior on scale {
+                    Anim {
+                        easing.bezierCurve: Appearance.anim.curves.standardDecel
+                    }
+                }
             }
         }
 
@@ -124,56 +83,22 @@ Item {
             id: ws
 
             required property HyprlandWorkspace modelData
-            readonly property int size: label.Layout.preferredHeight + (hasWindows ? windows.implicitHeight + Appearance.padding.small : 0)
-            property int wsId
-            property string icon
-            property bool hasWindows
+            required property int index
+            readonly property bool isActive: modelData.name === root.activeSpecial
+            readonly property bool isOccupied: modelData.lastIpcObject.windows > 0
+            readonly property bool hasWindows: isOccupied && Config.bar.workspaces.showWindowsOnSpecialWorkspaces
+            readonly property string icon: Icons.getSpecialWsIcon(modelData.name)
 
             anchors.left: view.contentItem.left
             anchors.right: view.contentItem.right
 
             spacing: 0
 
-            Component.onCompleted: {
-                wsId = modelData.id;
-                icon = Icons.getSpecialWsIcon(modelData.name);
-                hasWindows = Config.bar.workspaces.showWindowsOnSpecialWorkspaces && modelData.lastIpcObject.windows > 0;
-            }
-
-            // Hacky thing cause modelData gets destroyed before the remove anim finishes
-            Connections {
-                target: ws.modelData
-
-                function onIdChanged(): void {
-                    if (ws.modelData)
-                        ws.wsId = ws.modelData.id;
-                }
-
-                function onNameChanged(): void {
-                    if (ws.modelData)
-                        ws.icon = Icons.getSpecialWsIcon(ws.modelData.name);
-                }
-
-                function onLastIpcObjectChanged(): void {
-                    if (ws.modelData)
-                        ws.hasWindows = Config.bar.workspaces.showWindowsOnSpecialWorkspaces && ws.modelData.lastIpcObject.windows > 0;
-                }
-            }
-
-            Connections {
-                target: Config.bar.workspaces
-
-                function onShowWindowsOnSpecialWorkspacesChanged(): void {
-                    if (ws.modelData)
-                        ws.hasWindows = Config.bar.workspaces.showWindowsOnSpecialWorkspaces && ws.modelData.lastIpcObject.windows > 0;
-                }
-            }
-
             Loader {
                 id: label
 
                 Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
-                Layout.preferredHeight: Config.bar.sizes.innerWidth - Appearance.padding.normal * 2  // Slightly smaller for compactness
+                Layout.preferredHeight: Config.bar.sizes.innerWidth - Appearance.padding.small * 2
 
                 sourceComponent: ws.icon.length === 1 ? letterComp : iconComp
 
@@ -183,7 +108,19 @@ Item {
                     MaterialIcon {
                         fill: 1
                         text: ws.icon
+                        color: ws.isActive && Config.bar.workspaces.activeIndicator
+                            ? Colours.palette.m3onPrimary
+                            : Config.bar.workspaces.occupiedBg || ws.isOccupied
+                                ? Colours.palette.m3onSurface
+                                : Colours.layer(Colours.palette.m3outlineVariant, 2)
                         verticalAlignment: Qt.AlignVCenter
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Appearance.anim.durations.normal
+                                easing.bezierCurve: Appearance.anim.curves.emphasized
+                            }
+                        }
                     }
                 }
 
@@ -193,11 +130,22 @@ Item {
                     StyledText {
                         font.pointSize: Appearance.font.size.smaller * 0.85
                         text: ws.icon
-                        color: Colours.palette.m3onSurface
+                        color: ws.isActive && Config.bar.workspaces.activeIndicator
+                            ? Colours.palette.m3onPrimary
+                            : Config.bar.workspaces.occupiedBg || ws.isOccupied
+                                ? Colours.palette.m3onSurface
+                                : Colours.layer(Colours.palette.m3outlineVariant, 2)
                         verticalAlignment: Qt.AlignVCenter
                         horizontalAlignment: Qt.AlignHCenter
                         elide: Text.ElideNone
                         wrapMode: Text.NoWrap
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Appearance.anim.durations.normal
+                                easing.bezierCurve: Appearance.anim.curves.emphasized
+                            }
+                        }
                     }
                 }
             }
@@ -205,13 +153,14 @@ Item {
             Loader {
                 id: windows
 
+                asynchronous: true
+
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillHeight: true
-                Layout.preferredHeight: implicitHeight
+                Layout.topMargin: -Config.bar.sizes.innerWidth / 10
 
                 visible: active
                 active: ws.hasWindows
-                asynchronous: true
 
                 sourceComponent: Column {
                     spacing: 0
