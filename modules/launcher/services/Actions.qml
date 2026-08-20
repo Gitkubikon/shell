@@ -1,6 +1,7 @@
 pragma Singleton
 
 import ".."
+import "../../configeditor"
 import QtQuick
 import Quickshell
 import qs.services
@@ -49,11 +50,6 @@ Searcher {
             } else {
                 list.visibilities.launcher = false;
                 Quickshell.execDetached(command);
-            }
-        }
-    }
-}
-               Quickshell.execDetached(command);
             }
         }
     }

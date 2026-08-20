@@ -46,18 +46,14 @@ StyledClippingRect {
             blurMax: 32
         }
 
-        Loader {
-            asynchronous: true
-            active: Config.bar.workspaces.occupiedBg
-
+        OccupiedBg {
             anchors.fill: parent
             anchors.margins: Appearance.padding.small
+            visible: Config.bar.workspaces.occupiedBg
 
-            sourceComponent: OccupiedBg {
-                workspaces: workspaces
-                occupied: root.occupied
-                groupOffset: root.groupOffset
-            }
+            workspaces: workspaces
+            occupied: root.occupied
+            groupOffset: root.groupOffset
         }
 
         ColumnLayout {

@@ -20,36 +20,37 @@ Singleton {
         return alias?.to ?? player.identity;
     }
 
-    // Cache last known art URL per track — browsers send artUrl intermittently
+    // Cache art URL per track — some players (e.g. YouTube Music via browser)
+    // briefly provide mpris:artUrl then clear it in a later metadata update.
     property string _cachedArtUrl: ""
     property string _cachedTrackId: ""
 
     function getArtUrl(player: MprisPlayer): string {
-        if (!player) return "";
+        if (!player)
+            return "";
 
-        // Track changed — reset cache
-        const trackId = (player.trackTitle ?? "") + (player.trackArtist ?? "");
+        const trackId = player.trackTitle + "\0" + player.trackArtist;
         if (trackId !== _cachedTrackId) {
             _cachedTrackId = trackId;
             _cachedArtUrl = "";
         }
 
-        // Update cache if player provides a new art URL
-        const url = player.trackArtUrl ?? "";
-        if (url.length > 0) {
-            _cachedArtUrl = url;
+        if (player.trackArtUrl) {
+            _cachedArtUrl = player.trackArtUrl;
+            return player.trackArtUrl;
         }
 
-        if (_cachedArtUrl.length > 0)
+        if (_cachedArtUrl)
             return _cachedArtUrl;
 
-        const xesamUrl = player.metadata["xesam:url"] ?? "";
-        if (xesamUrl.startsWith("https://www.youtube.com/watch")) {
-            // Fallback for youtube
-            const id = xesamUrl.match(/[?&]v=([\w-]{11})/)?.[1];
-            return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
+        const url = player.metadata["xesam:url"] ?? "";
+        if (url.startsWith("https://www.youtube.com/watch") || url.startsWith("https://music.youtube.com/watch")) {
+            const id = url.match(/[?&]v=([\w-]{11})/)?.[1];
+            if (id) {
+                _cachedArtUrl = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+                return _cachedArtUrl;
+            }
         }
-
         return "";
     }
 

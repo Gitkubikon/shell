@@ -15,32 +15,42 @@ Item {
 
     property list<var> pills: []
 
-    onOccupiedChanged: {
+    function updatePills() {
         if (!occupied)
             return;
+        
         let count = 0;
+        const newPills = [...pills];
         const start = groupOffset;
         const end = start + Config.bar.workspaces.shown;
+        
         for (const [ws, occ] of Object.entries(occupied)) {
             if (ws > start && ws <= end && occ) {
                 const isFirstInGroup = Number(ws) === start + 1;
-                const isLastInGroup = Number(ws) === end;
                 if (isFirstInGroup || !occupied[ws - 1]) {
-                    if (pills[count])
-                        pills[count].start = ws;
-                    else
-                        pills.push(pillComp.createObject(root, {
+                    if (newPills[count]) {
+                        newPills[count].start = ws;
+                    } else {
+                        newPills.push(pillComp.createObject(root, {
                             start: ws
                         }));
+                    }
                     count++;
                 }
-                if ((isLastInGroup || !occupied[ws + 1]) && pills[count - 1])
-                    pills[count - 1].end = ws;
+                if ((Number(ws) === end || !occupied[Number(ws) + 1]) && newPills[count - 1])
+                    newPills[count - 1].end = ws;
             }
         }
-        if (pills.length > count)
-            pills.splice(count, pills.length - count).forEach(p => p.destroy());
+        
+        if (newPills.length > count) {
+            newPills.splice(count, newPills.length - count).forEach(p => p.destroy());
+        }
+        
+        root.pills = newPills;
     }
+
+    onOccupiedChanged: updatePills()
+    onGroupOffsetChanged: updatePills()
 
     Repeater {
         model: ScriptModel {
