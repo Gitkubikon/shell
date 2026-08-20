@@ -2,12 +2,24 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Caelestia
 import qs.components
 import qs.services
 
 Singleton {
     property ShellRoot shellRoot
+
+    // Local: hot corner (top left) toggles the overview. State lives here rather
+    // than in Interactions.qml because that is instantiated per screen, which
+    // registered the "hotcorner" IPC target once per monitor (only the first
+    // registration was used, so `hotcorner ignore` suppressed one screen only).
+    property bool hotCornerCooldown
+
+    function suppressHotCorner(): void {
+        hotCornerCooldown = true;
+        hotCornerTimer.restart();
+    }
 
     function anySidebarOpen(): bool {
         return states.instances.some(s => s.sidebar);
@@ -97,4 +109,20 @@ Singleton {
                 target[slot] = null;
         }
     }
+
+    Timer {
+        id: hotCornerTimer
+
+        interval: 1000
+        onTriggered: ShellState.hotCornerCooldown = false
+    }
+
+    IpcHandler {
+        function ignore(): void {
+            ShellState.suppressHotCorner();
+        }
+
+        target: "hotcorner"
+    }
+
 }

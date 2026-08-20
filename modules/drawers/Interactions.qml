@@ -24,7 +24,6 @@ CustomMouseArea {
     property bool osdShortcutActive
     property bool utilitiesShortcutActive
     property bool inHotCorner
-    property bool hotCornerCooldown: false
 
     function withinPanelHeight(panel: Item, x: real, y: real): bool {
         const panelY = root.borderThickness + panel.y;
@@ -103,9 +102,8 @@ CustomMouseArea {
 
         if (x < 5 && y < 5) {
             if (!root.inHotCorner) {
-                if (!root.hotCornerCooldown) {
-                    root.hotCornerCooldown = true;
-                    hotCornerTimer.start();
+                if (!ShellState.hotCornerCooldown) {
+                    ShellState.suppressHotCorner();
                     Quickshell.execDetached(["qs", "ipc", "-c", "overview", "call", "overview", "toggle"]);
                 }
                 root.inHotCorner = true;
@@ -264,25 +262,6 @@ CustomMouseArea {
     }
 
     // Monitor individual visibility changes
-    // Local: hot corner (top left) toggles the overview; `hotcorner ignore` IPC
-    // suppresses it for a second so scripts can move the cursor there
-    Timer {
-        id: hotCornerTimer
-
-        interval: 1000
-        repeat: false
-        onTriggered: root.hotCornerCooldown = false
-    }
-
-    IpcHandler {
-        function ignore(): void {
-            root.hotCornerCooldown = true;
-            hotCornerTimer.start();
-        }
-
-        target: "hotcorner"
-    }
-
     Connections {
         function onLauncherChanged() {
             // If launcher is hidden, clear shortcut flags for dashboard and OSD
