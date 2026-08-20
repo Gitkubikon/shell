@@ -1,26 +1,27 @@
 pragma ComponentBehavior: Bound
 
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Shapes
+import Caelestia
+import Caelestia.Config
 import qs.components
 import qs.components.controls
 import qs.components.effects
 import qs.services
-import qs.config
-import Caelestia
-import QtQuick
-import QtQuick.Layouts
-import QtQuick.Shapes
 
 Loader {
     id: root
 
     required property var props
+    required property matrix4x4 deformMatrix
 
+    asynchronous: true
     anchors.fill: parent
     z: 1000
 
     opacity: root.props.screenshotConfirmDelete ? 1 : 0
     active: opacity > 0
-    asynchronous: true
 
     sourceComponent: MouseArea {
         id: deleteConfirmation
@@ -34,14 +35,16 @@ Loader {
 
         Item {
             anchors.fill: parent
-            anchors.margins: -Appearance.padding.large
-            anchors.rightMargin: -Appearance.padding.large - Config.border.thickness
-            anchors.bottomMargin: -Appearance.padding.large - Config.border.thickness
+            anchors.margins: -Tokens.padding.large
+            anchors.rightMargin: -Tokens.padding.large - Config.border.thickness
+            anchors.bottomMargin: -Tokens.padding.large - Config.border.thickness
             opacity: 0.5
 
             StyledRect {
                 anchors.fill: parent
-                topLeftRadius: Config.border.rounding
+                anchors.rightMargin: -parent.width * (1 - root.deformMatrix.m11) / 2 // Additional bit to account for deform
+                anchors.bottomMargin: -parent.height * 0.1 // Additional bit to account for overshoot
+                topLeftRadius: Tokens.rounding.extraLarge
                 color: Colours.palette.m3scrim
             }
 
@@ -52,93 +55,162 @@ Loader {
                 preferredRendererType: Shape.CurveRenderer
                 asynchronous: true
 
+                // Bottom left
                 ShapePath {
-                    startX: -Config.border.rounding * 2
-                    startY: shape.height - Config.border.thickness
+                    startX: -root.Config.border.smoothing * 2
+                    startY: shape.height - root.Config.border.thickness
                     strokeWidth: 0
                     fillGradient: LinearGradient {
                         orientation: LinearGradient.Horizontal
-                        x1: -Config.border.rounding * 2
+                        x1: -root.Config.border.smoothing * 2
 
-                        GradientStop { position: 0; color: Qt.alpha(Colours.palette.m3scrim, 0) }
-                        GradientStop { position: 1; color: Colours.palette.m3scrim }
+                        GradientStop {
+                            position: 0
+                            color: Qt.alpha(Colours.palette.m3scrim, 0)
+                        }
+                        GradientStop {
+                            position: 1
+                            color: Colours.palette.m3scrim
+                        }
                     }
 
-                    PathLine { relativeX: Config.border.rounding; relativeY: 0 }
-                    PathArc { relativeY: -Config.border.rounding; radiusX: Config.border.rounding; radiusY: Config.border.rounding; direction: PathArc.Counterclockwise }
-                    PathLine { relativeX: 0; relativeY: Config.border.rounding + Config.border.thickness }
-                    PathLine { relativeX: -Config.border.rounding * 2; relativeY: 0 }
+                    PathLine {
+                        relativeX: root.Config.border.smoothing
+                        relativeY: 0
+                    }
+                    PathCubic {
+                        relativeX: root.Config.border.smoothing
+                        relativeY: -root.Config.border.smoothing
+                        relativeControl1X: root.Config.border.smoothing * 0.93
+                        relativeControl1Y: -root.Config.border.smoothing * 0.07
+                        relativeControl2X: root.Config.border.smoothing * 0.93
+                        relativeControl2Y: -root.Config.border.smoothing * 0.07
+                    }
+                    PathLine {
+                        relativeX: 0
+                        relativeY: root.Config.border.smoothing + root.Config.border.thickness
+                    }
+                    PathLine {
+                        relativeX: -root.Config.border.smoothing * 2
+                        relativeY: 0
+                    }
                 }
 
+                // Top right curve
                 ShapePath {
-                    startX: shape.width - Config.border.rounding - Config.border.thickness
+                    startX: shape.width - root.Config.border.smoothing - root.Config.border.thickness + (1 - root.deformMatrix.m11) * shape.width / 2
                     strokeWidth: 0
                     fillGradient: LinearGradient {
                         orientation: LinearGradient.Vertical
-                        y1: -Config.border.rounding * 2
+                        y1: -root.Config.border.smoothing * 2
 
-                        GradientStop { position: 0; color: Qt.alpha(Colours.palette.m3scrim, 0) }
-                        GradientStop { position: 1; color: Colours.palette.m3scrim }
+                        GradientStop {
+                            position: 0
+                            color: Qt.alpha(Colours.palette.m3scrim, 0)
+                        }
+                        GradientStop {
+                            position: 1
+                            color: Colours.palette.m3scrim
+                        }
                     }
 
-                    PathArc { relativeX: Config.border.rounding; relativeY: -Config.border.rounding; radiusX: Config.border.rounding; radiusY: Config.border.rounding; direction: PathArc.Counterclockwise }
-                    PathLine { relativeX: 0; relativeY: -Config.border.rounding }
-                    PathLine { relativeX: Config.border.thickness; relativeY: 0 }
-                    PathLine { relativeX: 0 }
+                    PathCubic {
+                        relativeX: root.Config.border.smoothing
+                        relativeY: -root.Config.border.smoothing
+                        relativeControl1X: root.Config.border.smoothing * 0.93
+                        relativeControl1Y: -root.Config.border.smoothing * 0.07
+                        relativeControl2X: root.Config.border.smoothing * 0.93
+                        relativeControl2Y: -root.Config.border.smoothing * 0.07
+                    }
+                    PathLine {
+                        relativeX: 0
+                        relativeY: -root.Config.border.smoothing
+                    }
+                    PathLine {
+                        relativeX: root.Config.border.thickness
+                        relativeY: 0
+                    }
+                    PathLine {
+                        relativeX: 0
+                    }
                 }
             }
         }
 
         StyledRect {
             anchors.centerIn: parent
-            radius: Appearance.rounding.large
+            radius: Tokens.rounding.extraLarge
             color: Colours.palette.m3surfaceContainerHigh
 
             scale: 0
             Component.onCompleted: scale = Qt.binding(() => root.props.screenshotConfirmDelete ? 1 : 0)
 
-            width: Math.min(parent.width - Appearance.padding.large * 2, implicitWidth)
-            implicitWidth: deleteConfirmationLayout.implicitWidth + Appearance.padding.large * 3
-            implicitHeight: deleteConfirmationLayout.implicitHeight + Appearance.padding.large * 3
+            width: Math.min(parent.width - Tokens.padding.extraLargeIncreased, implicitWidth)
+            implicitWidth: deleteConfirmationLayout.implicitWidth + Tokens.padding.extraExtraLarge
+            implicitHeight: deleteConfirmationLayout.implicitHeight + Tokens.padding.extraExtraLarge
 
-            MouseArea { anchors.fill: parent }
+            MouseArea {
+                anchors.fill: parent
+            }
 
-            Elevation { anchors.fill: parent; radius: parent.radius; z: -1; level: 3 }
+            Elevation {
+                anchors.fill: parent
+                radius: parent.radius
+                z: -1
+                level: 3
+            }
 
             ColumnLayout {
                 id: deleteConfirmationLayout
 
                 anchors.fill: parent
-                anchors.margins: Appearance.padding.large * 1.5
-                spacing: Appearance.spacing.normal
+                anchors.margins: Tokens.padding.large * 1.5
+                spacing: Tokens.spacing.medium
 
-                StyledText { text: qsTr("Delete screenshot?"); font.pointSize: Appearance.font.size.large }
+                StyledText {
+                    text: qsTr("Delete screenshot?")
+                    font: Tokens.font.body.large
+                }
 
                 StyledText {
                     Layout.fillWidth: true
                     text: qsTr("Screenshot '%1' will be permanently deleted.").arg(deleteConfirmation.path)
                     color: Colours.palette.m3onSurfaceVariant
-                    font.pointSize: Appearance.font.size.small
+                    font: Tokens.font.body.small
                     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                 }
 
                 RowLayout {
-                    Layout.topMargin: Appearance.spacing.normal
+                    Layout.topMargin: Tokens.spacing.medium
                     Layout.alignment: Qt.AlignRight
-                    spacing: Appearance.spacing.normal
-
-                    TextButton { text: qsTr("Cancel"); type: TextButton.Text; onClicked: root.props.screenshotConfirmDelete = "" }
+                    spacing: Tokens.spacing.medium
 
                     TextButton {
-                        text: qsTr("Delete"); type: TextButton.Text
-                        onClicked: { CUtils.deleteFile(Qt.resolvedUrl(root.props.screenshotConfirmDelete)); root.props.screenshotConfirmDelete = "" }
+                        text: qsTr("Cancel")
+                        type: TextButton.Text
+                        onClicked: root.props.screenshotConfirmDelete = ""
+                    }
+
+                    TextButton {
+                        text: qsTr("Delete")
+                        type: TextButton.Text
+                        onClicked: {
+                            CUtils.deleteFile(Qt.resolvedUrl(root.props.screenshotConfirmDelete));
+                            root.props.screenshotConfirmDelete = "";
+                        }
                     }
                 }
             }
 
-            Behavior on scale { Anim { duration: Appearance.anim.durations.expressiveDefaultSpatial; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
+            Behavior on scale {
+                Anim {}
+            }
         }
     }
 
-    Behavior on opacity { Anim {} }
+    Behavior on opacity {
+        Anim {
+            type: Anim.DefaultEffects
+        }
+    }
 }

@@ -2,43 +2,41 @@ pragma ComponentBehavior: Bound
 
 import qs.components
 import qs.components.controls
-import qs.components.effects
 import qs.services
-import qs.config
+import Caelestia.Config
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
 import QtQuick.Effects
 import "calendar_layout.js" as CalendarLayout
 
 Item {
     id: root
 
-    required property DashboardState dashState
+    required property ScreenState screenState
 
     readonly property int firstDay: {
-        const cfg = Config.services && Config.services.calendarFirstDayOfWeek;
+        const cfg = GlobalConfig.services.calendarFirstDayOfWeek;
         const value = Math.max(0, Math.min(6, cfg === undefined || cfg === null ? 0 : cfg));
         return value;
     }
-    readonly property date viewDate: dashState?.currentDate
-                                      ? new Date(dashState.currentDate.getFullYear(), dashState.currentDate.getMonth(), 1)
+    readonly property date viewDate: screenState?.dashboardDate
+                                      ? new Date(screenState.dashboardDate.getFullYear(), screenState.dashboardDate.getMonth(), 1)
                                       : new Date()
     readonly property var calendarLayout: buildCalendar(viewDate, isCurrentMonth(viewDate), firstDay)
-    readonly property var selectedEvents: Calendar.eventsOn(dashState?.currentDate ?? new Date())
+    readonly property var selectedEvents: Calendar.eventsOn(screenState?.dashboardDate ?? new Date())
                                               .sort((a, b) => a.startDate - b.startDate)
     property bool overlayVisible: false
-    property date overlayDate: dashState?.currentDate ?? new Date()
+    property date overlayDate: screenState?.dashboardDate ?? new Date()
     property var overlayEvents: []
-    readonly property real gridSpacing: Appearance.spacing.smaller
+    readonly property real gridSpacing: Tokens.spacing.medium
     readonly property int gridRows: Math.max(1, calendarLayout ? calendarLayout.length : 6)
     readonly property real widthBasedCellSize: Math.max(36, (content.width - gridSpacing * 6) / 7)
     readonly property real heightAvailableForGrid: {
         const availableHeight = calendarBody.height || root.height || (root.parent ? root.parent.height : 0);
         if (availableHeight <= 0)
             return 0;
-        const margins = Appearance.padding.large * 2;
+        const margins = Tokens.padding.large * 2;
         const headers = monthRow.implicitHeight + weekdayRow.implicitHeight;
         const spacers = content.spacing * 2; // spacing above/below gridWrapper
         return Math.max(0, availableHeight - margins - headers - spacers);
@@ -51,22 +49,22 @@ Item {
 
     anchors.left: parent.left
     anchors.right: parent.right
-    implicitHeight: content.implicitHeight + Appearance.padding.large * 2
+    implicitHeight: content.implicitHeight + Tokens.padding.large * 2
 
     WheelHandler {
         target: null
         onWheel: event => {
             if (event.angleDelta.y > 0)
-                root.dashState.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+                root.screenState.dashboardDate = new Date(root.viewDate.getFullYear(), root.viewDate.getMonth() - 1, 1);
             else if (event.angleDelta.y < 0)
-                root.dashState.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+                root.screenState.dashboardDate = new Date(root.viewDate.getFullYear(), root.viewDate.getMonth() + 1, 1);
         }
     }
 
     TapHandler {
         acceptedButtons: Qt.MiddleButton
         onTapped: {
-            root.dashState.currentDate = new Date();
+            root.screenState.dashboardDate = new Date();
         }
     }
 
@@ -117,20 +115,20 @@ Item {
 
     function toDate(cell) {
         if (!cell || cell.day === "" || cell.year === undefined || cell.month === undefined)
-            return dashState?.currentDate ?? new Date();
+            return screenState?.dashboardDate ?? new Date();
         return new Date(cell.year, cell.month, cell.day);
     }
 
     function openEventsOverlay(cellItem) {
         const targetCell = cellItem && cellItem.safeCell ? cellItem.safeCell : null;
-        const targetDate = targetCell ? toDate(targetCell) : dashState?.currentDate ?? new Date();
+        const targetDate = targetCell ? toDate(targetCell) : screenState?.dashboardDate ?? new Date();
 
-        if (!dashState?.currentDate) {
-            dashState.currentDate = targetDate;
+        if (!screenState?.dashboardDate) {
+            screenState.dashboardDate = targetDate;
         }
 
         if (targetCell && targetCell.day !== "") {
-            dashState.currentDate = targetDate;
+            screenState.dashboardDate = targetDate;
         }
 
         // Reset and repopulate overlay data to avoid stale/mingled entries
@@ -161,26 +159,24 @@ Item {
             id: content
 
             anchors.fill: parent
-            anchors.margins: Appearance.padding.large
-            spacing: Appearance.spacing.normal
+            anchors.margins: Tokens.padding.large
+            spacing: Tokens.spacing.medium
 
             RowLayout {
                 id: monthRow
                 Layout.fillWidth: true
 
-                spacing: Appearance.spacing.small
+                spacing: Tokens.spacing.small
 
                 Item {
                     implicitWidth: implicitHeight
-                    implicitHeight: prevMonthIcon.implicitHeight + Appearance.padding.small * 2
+                    implicitHeight: prevMonthIcon.implicitHeight + Tokens.padding.extraSmall * 2
 
                     StateLayer {
                         id: prevMonthState
 
-                        radius: Appearance.rounding.full
-                        function onClicked() {
-                            root.dashState.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
-                        }
+                        radius: Tokens.rounding.full
+                        onClicked: root.screenState.dashboardDate = new Date(root.viewDate.getFullYear(), root.viewDate.getMonth() - 1, 1)
                     }
 
                     MaterialIcon {
@@ -189,8 +185,7 @@ Item {
                         anchors.centerIn: parent
                         text: "chevron_left"
                         color: Colours.palette.m3tertiary
-                        font.pointSize: Appearance.font.size.normal
-                        font.weight: 700
+                        fontStyle: Tokens.font.icon.builders.small.weight(Font.Bold).build()
                     }
                 }
 
@@ -200,32 +195,26 @@ Item {
                     text: Qt.formatDate(viewDate, "MMMM yyyy")
                     horizontalAlignment: Text.AlignHCenter
                     color: Colours.palette.m3primary
-                    font.pointSize: Appearance.font.size.normal
-                    font.weight: 600
+                    font: Tokens.font.title.builders.small.weight(Font.DemiBold).build()
 
                     StateLayer {
                         anchors.fill: parent
-                        anchors.margins: -Appearance.padding.small
-                        radius: Appearance.rounding.full
-                        disabled: isCurrentMonth(viewDate)
-
-                        function onClicked() {
-                            root.dashState.currentDate = new Date();
-                        }
+                        anchors.margins: -Tokens.padding.extraSmall
+                        radius: Tokens.rounding.full
+                        disabled: root.isCurrentMonth(root.viewDate)
+                        onClicked: root.screenState.dashboardDate = new Date()
                     }
                 }
 
                 Item {
                     implicitWidth: implicitHeight
-                    implicitHeight: nextMonthIcon.implicitHeight + Appearance.padding.small * 2
+                    implicitHeight: nextMonthIcon.implicitHeight + Tokens.padding.extraSmall * 2
 
                     StateLayer {
                         id: nextMonthState
 
-                        radius: Appearance.rounding.full
-                        function onClicked() {
-                            root.dashState.currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
-                        }
+                        radius: Tokens.rounding.full
+                        onClicked: root.screenState.dashboardDate = new Date(root.viewDate.getFullYear(), root.viewDate.getMonth() + 1, 1)
                     }
 
                     MaterialIcon {
@@ -234,8 +223,7 @@ Item {
                         anchors.centerIn: parent
                         text: "chevron_right"
                         color: Colours.palette.m3tertiary
-                        font.pointSize: Appearance.font.size.normal
-                        font.weight: 700
+                        fontStyle: Tokens.font.icon.builders.small.weight(Font.Bold).build()
                     }
                 }
             }
@@ -247,7 +235,7 @@ Item {
 
                 Repeater {
                     model: (CalendarLayout && CalendarLayout.getWeekDays)
-                               ? CalendarLayout.getWeekDays(firstDay)
+                               ? CalendarLayout.getWeekDays(root.firstDay)
                                : [
                                    { day: "Mo", today: 0 },
                                    { day: "Tu", today: 0 },
@@ -266,7 +254,7 @@ Item {
                         Layout.alignment: Qt.AlignHCenter
                         text: modelData.day
                         horizontalAlignment: Text.AlignHCenter
-                        font.weight: 600
+                        font: Tokens.font.body.builders.small.weight(Font.Medium).build()
                         color: Colours.palette.m3onSurfaceVariant
                     }
                 }
@@ -281,7 +269,7 @@ Item {
                 Layout.preferredHeight: root.cellSize * root.gridRows + root.gridSpacing * (root.gridRows - 1)
 
                 Repeater {
-                    model: calendarLayout || []
+                    model: root.calendarLayout || []
 
                     delegate: RowLayout {
                         required property var modelData
@@ -314,35 +302,27 @@ Item {
             id: overlayLayer
 
             anchors.fill: parent
-            visible: overlayVisible
+            visible: root.overlayVisible
             z: 9999
 
             StyledRect {
                 id: overlayCard
 
                 anchors.fill: parent
-                radius: Appearance.rounding.large
+                radius: Tokens.rounding.extraLarge
                 color: "transparent"
 
                 ShaderEffectSource {
                     id: blurSource
                     sourceItem: calendarBody
                     visible: false
-                    live: overlayVisible
+                    live: root.overlayVisible
                 }
 
-                // Blurred Background
-                Item {
+                // Blurred background
+                StyledClippingRect {
                     anchors.fill: parent
-                    layer.enabled: true
-                    layer.effect: OpacityMask {
-                        maskSource: Rectangle {
-                            width: overlayCard.width
-                            height: overlayCard.height
-                            radius: overlayCard.radius
-                            visible: false
-                        }
-                    }
+                    radius: overlayCard.radius
 
                     MultiEffect {
                         anchors.fill: parent
@@ -353,7 +333,7 @@ Item {
                     }
 
                     // High opacity tint to hide sharp text
-                    Rectangle {
+                    StyledRect {
                         anchors.fill: parent
                         color: Colours.palette.m3surfaceContainerHigh
                         opacity: 0.95
@@ -362,18 +342,17 @@ Item {
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: Appearance.padding.normal
-                    spacing: Appearance.spacing.normal
+                    anchors.margins: Tokens.padding.medium
+                    spacing: Tokens.spacing.medium
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: Appearance.spacing.smaller
+                        spacing: Tokens.spacing.medium
 
                         MaterialIcon {
                             text: "event_note"
                             color: Colours.palette.m3primary
-                            font.pointSize: Appearance.font.size.normal
-                            font.weight: 700
+                            fontStyle: Tokens.font.icon.builders.small.weight(Font.Bold).build()
                         }
 
                         ColumnLayout {
@@ -382,8 +361,8 @@ Item {
 
                             StyledText {
                                 Layout.fillWidth: true
-                                text: Qt.formatDate(overlayDate ?? new Date(), "dddd, dd MMM yyyy")
-                                font.weight: 700
+                                text: Qt.formatDate(root.overlayDate ?? new Date(), "dddd, dd MMM yyyy")
+                                font: Tokens.font.title.small
                                 color: Colours.palette.m3onSurface
                                 wrapMode: Text.Wrap
                             }
@@ -391,7 +370,7 @@ Item {
                             StyledText {
                                 Layout.fillWidth: true
                                 text: {
-                                    const count = overlayEvents.length;
+                                    const count = root.overlayEvents.length;
                                     return count === 1 ? qsTr("1 event") : qsTr("%1 events").arg(count);
                                 }
                                 color: Colours.palette.m3onSurfaceVariant
@@ -404,36 +383,36 @@ Item {
                             id: closeButton
                             type: IconButton.Tonal
                             icon: "close"
-                            padding: Appearance.padding.smaller
-                            font.pointSize: Appearance.font.size.normal
+                            padding: Tokens.padding.small
+                            font: Tokens.font.icon.small
                             implicitHeight: Math.max(34, label.implicitHeight + padding * 2)
-                            onClicked: overlayVisible = false
+                            onClicked: root.overlayVisible = false
                         }
                     }
 
                     RowLayout {
                         Layout.fillWidth: true
                         visible: Calendar.loading || !Calendar.khalAvailable
-                        spacing: Appearance.spacing.smaller
+                        spacing: Tokens.spacing.medium
 
                         BusyIndicator {
                             visible: Calendar.loading
                             running: visible
-                            width: 18
-                            height: 18
+                            implicitWidth: 18
+                            implicitHeight: 18
                         }
 
                         StyledText {
                             text: qsTr("Refreshing events…")
                             color: Colours.palette.m3onSurfaceVariant
-                            font.weight: 600
+                            font: Tokens.font.body.builders.small.weight(Font.DemiBold).build()
                             visible: Calendar.loading
                         }
 
                         StyledText {
                             text: Calendar.errorMessage || qsTr("Calendar backend not available")
                             color: Colours.palette.m3error
-                            font.weight: 600
+                            font: Tokens.font.body.builders.small.weight(Font.DemiBold).build()
                             visible: !Calendar.khalAvailable
                         }
 
@@ -446,7 +425,7 @@ Item {
                         clip: true
                         sourceComponent: !Calendar.khalAvailable
                                            ? backendErrorComponent
-                                           : (overlayEvents.length === 0 ? overlayEmptyComponent : overlayEventsListComponent)
+                                           : (root.overlayEvents.length === 0 ? overlayEmptyComponent : overlayEventsListComponent)
                     }
                 }
             }
@@ -463,7 +442,7 @@ Item {
                 anchors.centerIn: parent
                 text: Calendar.errorMessage || qsTr("Install/configure Caelestia calendar to show events")
                 color: Colours.palette.m3error
-                font.weight: 600
+                font: Tokens.font.body.builders.small.weight(Font.DemiBold).build()
                 wrapMode: Text.Wrap
                 horizontalAlignment: Text.AlignHCenter
             }
@@ -480,7 +459,7 @@ Item {
                 anchors.centerIn: parent
                 text: Calendar.loading ? qsTr("Loading events…") : qsTr("No events for this day")
                 color: Colours.palette.m3onSurfaceVariant
-                font.weight: 600
+                font: Tokens.font.body.builders.small.weight(Font.DemiBold).build()
                 wrapMode: Text.Wrap
                 horizontalAlignment: Text.AlignHCenter
             }
@@ -499,26 +478,26 @@ Item {
             ColumnLayout {
                 id: eventsColumn
 
-                width: parent.width - Appearance.padding.normal
+                width: parent.width - root.Tokens.padding.medium
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Appearance.spacing.small
+                spacing: Tokens.spacing.small
 
                 Repeater {
-                    model: overlayEvents ? overlayEvents.slice(0) : []
+                    model: root.overlayEvents ? root.overlayEvents.slice(0) : []
 
                     delegate: StyledRect {
                         required property var modelData
 
                         Layout.fillWidth: true
-                        implicitHeight: innerRow.implicitHeight + Appearance.padding.small * 2
-                        radius: Appearance.rounding.small
+                        implicitHeight: innerRow.implicitHeight + Tokens.padding.extraSmall * 2
+                        radius: Tokens.rounding.medium
                         color: Colours.palette.m3surfaceContainerHighest
 
                         RowLayout {
                             id: innerRow
                             anchors.fill: parent
-                            anchors.margins: Appearance.padding.small
-                            spacing: Appearance.spacing.small
+                            anchors.margins: Tokens.padding.extraSmall
+                            spacing: Tokens.spacing.small
 
                             // Color Indicator Strip
                             Rectangle {
@@ -543,8 +522,7 @@ Item {
                                     }
                                     wrapMode: Text.Wrap
                                     color: Colours.palette.m3onSurface
-                                    font.weight: 600
-                                    font.pointSize: Appearance.font.size.normal
+                                    font: Tokens.font.body.builders.medium.weight(Font.DemiBold).build()
                                 }
 
                                 RowLayout {
@@ -554,17 +532,16 @@ Item {
                                     StyledText {
                                         text: {
                                             const d = modelData && modelData.startDate ? new Date(modelData.startDate) : null;
-                                            return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
+                                            return d && !isNaN(d) ? Qt.formatDateTime(d, GlobalConfig.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
                                         }
-                                        font.weight: 500
-                                        font.pointSize: Appearance.font.size.smaller
+                                        font: Tokens.font.body.builders.small.weight(Font.Medium).build()
                                         color: Colours.palette.m3onSurfaceVariant
                                     }
 
                                     StyledText {
                                         text: "-"
                                         visible: timeEnd.visible
-                                        font.pointSize: Appearance.font.size.smaller
+                                        font: Tokens.font.body.small
                                         color: Colours.palette.m3onSurfaceVariant
                                     }
 
@@ -572,9 +549,9 @@ Item {
                                         id: timeEnd
                                         text: {
                                             const d = modelData && modelData.endDate ? new Date(modelData.endDate) : null;
-                                            return d && !isNaN(d) ? Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
+                                            return d && !isNaN(d) ? Qt.formatDateTime(d, GlobalConfig.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
                                         }
-                                        font.pointSize: Appearance.font.size.smaller
+                                        font: Tokens.font.body.small
                                         color: Colours.palette.m3onSurfaceVariant
                                         visible: modelData.endDate && modelData.startDate && modelData.endDate !== modelData.startDate
                                     }
@@ -594,7 +571,7 @@ Item {
 
         required property var cell
 
-        readonly property date currentDateVal: dashState?.currentDate ?? new Date()
+        readonly property date currentDateVal: screenState?.dashboardDate ?? new Date()
         readonly property date todayMidnight: {
             const d = new Date();
             d.setHours(0, 0, 0, 0);
@@ -637,7 +614,7 @@ Item {
             id: bg
             anchors.fill: parent
             anchors.margins: 2
-            radius: Appearance.rounding.small
+            radius: Tokens.rounding.medium
 
             color: dayCell.isSelected
                        ? Colours.palette.m3primaryContainer
@@ -652,12 +629,12 @@ Item {
 
             Item {
                 anchors.fill: parent
-                anchors.margins: Appearance.padding.small
+                anchors.margins: Tokens.padding.extraSmall
 
-                Text {
+                StyledText {
                     anchors.centerIn: parent
-                    text: `${safeCell.day}`
-                    font.weight: (dayCell.isSelected || dayCell.isToday) ? Font.Bold : Font.Normal
+                    text: `${dayCell.safeCell.day}`
+                    font: dayCell.isSelected || dayCell.isToday ? Tokens.font.body.builders.medium.weight(Font.Bold).build() : Tokens.font.body.medium
                     color: dayCell.isSelected
                            ? Colours.palette.m3onPrimaryContainer
                            : (dayCell.isToday
@@ -665,7 +642,6 @@ Item {
                                   : (dayCell.inMonth
                                          ? Colours.palette.m3onSurface
                                          : Colours.palette.m3onSurfaceVariant))
-                    font.pointSize: Appearance.font.size.normal
                 }
             }
 
@@ -682,6 +658,8 @@ Item {
                 Repeater {
                     model: parent.dotCount
                     Rectangle {
+                        required property int index
+
                         width: 4
                         height: 4
                         radius: 2

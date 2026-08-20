@@ -1,12 +1,33 @@
 #include "requests.hpp"
 
+#include <qjsvalue.h>
 #include <qjsvalueiterator.h>
+#include <qloggingcategory.h>
 #include <qnetworkaccessmanager.h>
 #include <qnetworkcookiejar.h>
 #include <qnetworkreply.h>
 #include <qnetworkrequest.h>
+#include <qqmlengine.h>
+#include <qvariant.h>
+
+Q_LOGGING_CATEGORY(lcRequests, "caelestia.requests", QtInfoMsg)
 
 namespace caelestia {
+
+namespace {
+
+QVariantMap responseMetadata(const QNetworkReply* reply) {
+    QVariantMap headers;
+
+    for (const auto& [name, value] : reply->rawHeaderPairs()) {
+        headers.insert(QString::fromLatin1(name).toLower(), QString::fromLatin1(value));
+    }
+
+    return { { "statusCode", reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() },
+        { "headers", headers } };
+}
+
+} // namespace
 
 Requests::Requests(QObject* parent)
     : QObject(parent)
@@ -14,7 +35,7 @@ Requests::Requests(QObject* parent)
 
 void Requests::get(const QUrl& url, QJSValue onSuccess, QJSValue onError, QJSValue headers) const {
     if (!onSuccess.isCallable()) {
-        qWarning() << "Requests::get: onSuccess is not callable";
+        qCWarning(lcRequests) << "get: onSuccess is not callable";
         return;
     }
 
@@ -35,13 +56,19 @@ void Requests::get(const QUrl& url, QJSValue onSuccess, QJSValue onError, QJSVal
 
     auto reply = m_manager->get(request);
 
-    QObject::connect(reply, &QNetworkReply::finished, [reply, onSuccess, onError]() {
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, onSuccess, onError]() {
+        const QString body = QString::fromUtf8(reply->readAll());
+
+        QJSValue metadata;
+        if (auto* engine = qmlEngine(this))
+            metadata = engine->toScriptValue(responseMetadata(reply));
+
         if (reply->error() == QNetworkReply::NoError) {
-            onSuccess.call({ QString(reply->readAll()) });
+            onSuccess.call({ body, metadata });
         } else if (onError.isCallable()) {
-            onError.call({ reply->errorString() });
+            onError.call({ reply->errorString(), metadata });
         } else {
-            qWarning() << "Requests::get: request failed with error" << reply->errorString();
+            qCWarning(lcRequests) << "get: request failed with error" << reply->errorString();
         }
 
         reply->deleteLater();

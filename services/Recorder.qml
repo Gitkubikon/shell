@@ -33,6 +33,7 @@ Singleton {
 
     QtObject {
         id: props
+
         property bool running: false
         property bool paused: false
         property real elapsed: 0
@@ -45,7 +46,7 @@ Singleton {
         command: ["pidof", "gpu-screen-recorder"]
         onExited: code => {
             const isActuallyRunning = (code === 0);
-            
+
             if (isActuallyRunning) {
                 if (root.needsStop) {
                     Quickshell.execDetached(["caelestia", "record"]);

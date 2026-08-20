@@ -2,7 +2,7 @@ pragma ComponentBehavior: Bound
 
 import qs.components
 import qs.services
-import qs.config
+import Caelestia.Config
 import Caelestia
 import Quickshell
 import Quickshell.Wayland
@@ -104,7 +104,8 @@ MouseArea {
     }
 
     function computeBbox(box: var): var {
-        if (!box || box.length < 4) return [0, 0, 0, 0];
+        if (!box || box.length < 4)
+            return [0, 0, 0, 0];
         const xs = box.map(p => p[0]);
         const ys = box.map(p => p[1]);
         return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
@@ -116,16 +117,12 @@ MouseArea {
         const text = msg.text || "";
         const conf = msg.conf || 0;
 
-        if (!text.trim()) return;
+        if (!text.trim())
+            return;
 
         // Scale coordinates from image space to screen space
         const scale = screencopy.scale || 1.0;
-        const scaledBbox = [
-            bbox[0] / scale,
-            bbox[1] / scale,
-            bbox[2] / scale,
-            bbox[3] / scale
-        ];
+        const scaledBbox = [bbox[0] / scale, bbox[1] / scale, bbox[2] / scale, bbox[3] / scale];
 
         const region = {
             polygon: box.map(p => [p[0] / scale, p[1] / scale]),
@@ -139,8 +136,7 @@ MouseArea {
 
     function copyText(text: string): void {
         Quickshell.execDetached(["wl-copy", text]);
-        Quickshell.execDetached(["notify-send", "-a", "caelestia-cli", "OCR Click-to-Copy",
-            `Copied: ${text.substring(0, 50)}${text.length > 50 ? "..." : ""}`]);
+        Quickshell.execDetached(["notify-send", "-a", "caelestia-cli", "OCR Click-to-Copy", `Copied: ${text.substring(0, 50)}${text.length > 50 ? "..." : ""}`]);
         closeOverlay();
     }
 
@@ -191,7 +187,7 @@ MouseArea {
             target: root
             property: "opacity"
             to: 0
-            duration: Appearance.anim.durations.large
+            duration: root.Tokens.anim.durations.large
         }
         ScriptAction {
             script: root.cleanup()
@@ -241,15 +237,22 @@ MouseArea {
             width: Math.max(1, bbox[2] - bbox[0])
             height: Math.max(1, bbox[3] - bbox[1])
 
-            color: isHovered ? Qt.rgba(Colours.palette.m3primary.r, Colours.palette.m3primary.g, Colours.palette.m3primary.b, 0.25)
-                            : Qt.rgba(Colours.palette.m3primary.r, Colours.palette.m3primary.g, Colours.palette.m3primary.b, 0.08)
+            color: isHovered ? Qt.rgba(Colours.palette.m3primary.r, Colours.palette.m3primary.g, Colours.palette.m3primary.b, 0.25) : Qt.rgba(Colours.palette.m3primary.r, Colours.palette.m3primary.g, Colours.palette.m3primary.b, 0.08)
             border.color: isHovered ? Colours.palette.m3primary : Qt.rgba(Colours.palette.m3primary.r, Colours.palette.m3primary.g, Colours.palette.m3primary.b, 0.4)
             border.width: isHovered ? 2 : 1
             radius: 4
 
-            Behavior on color { CAnim {} }
-            Behavior on border.color { CAnim {} }
-            Behavior on border.width { Anim { duration: 100 } }
+            Behavior on color {
+                CAnim {}
+            }
+            Behavior on border.color {
+                CAnim {}
+            }
+            Behavior on border.width {
+                Anim {
+                    type: Anim.FastEffects
+                }
+            }
 
             // Glow effect on hover
             layer.enabled: isHovered
@@ -321,7 +324,7 @@ MouseArea {
     // Fade in
     Behavior on opacity {
         Anim {
-            duration: Appearance.anim.durations.large
+            duration: root.Tokens.anim.durations.large
         }
     }
 

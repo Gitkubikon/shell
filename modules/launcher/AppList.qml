@@ -2,55 +2,34 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
+import Caelestia.Config
 import qs.components
 import qs.components.containers
 import qs.components.controls
 import qs.services
-import qs.config
 import qs.modules.launcher.items
 import qs.modules.launcher.services
 
 StyledListView {
     id: root
 
-    required property StyledTextField search
-    required property DrawerVisibilities visibilities
+    required property SearchBar search
+    required property ScreenState screenState
 
-    model: ScriptModel {
-        id: model
+    property string displayText
 
-        onValuesChanged: root.currentIndex = 0
+    readonly property var passGenPresets: ["main", "uuid", "hex 32", "base64 32", "pin 6", "password 32 -ns", "alpha 32"]
+
+    readonly property string requestedState: stateForText(search.text)
+    readonly property string displayState: stateForText(displayText)
+
+    function syncDisplayText(): void {
+        if (screenState.launcher && requestedState === displayState)
+            displayText = search.text;
     }
 
-    spacing: Appearance.spacing.small
-    orientation: Qt.Vertical
-    implicitHeight: (Config.launcher.sizes.itemHeight + spacing) * Math.min(Config.launcher.maxShown, count) - spacing
-
-    preferredHighlightBegin: 0
-    preferredHighlightEnd: height
-    highlightRangeMode: ListView.ApplyRange
-
-    highlightFollowsCurrentItem: false
-    highlight: StyledRect {
-        radius: Appearance.rounding.normal
-        color: Colours.palette.m3onSurface
-        opacity: 0.08
-
-        y: root.currentItem?.y ?? 0
-        implicitWidth: root.width
-        implicitHeight: root.currentItem?.implicitHeight ?? 0
-
-        Behavior on y {
-            Anim {
-                duration: Appearance.anim.durations.expressiveDefaultSpatial
-                easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial
-            }
-        }
-    }
-
-    state: {
-        const text = search.text;
-        const prefix = Config.launcher.actionPrefix;
+    function stateForText(text: string): string {
+        const prefix = GlobalConfig.launcher.actionPrefix;
         if (text.startsWith(prefix)) {
             for (const action of ["calc", "scheme", "variant", "passgen", "vpn"])
                 if (text.startsWith(`${prefix}${action} `))
@@ -62,6 +41,55 @@ StyledListView {
         return "apps";
     }
 
+    function resultsForText(text: string): var {
+        switch (stateForText(text)) {
+        case "actions":
+            return Actions.query(text);
+        case "calc":
+            return [0];
+        case "scheme":
+            return Schemes.query(text);
+        case "variant":
+            return M3Variants.query(text);
+        case "passgen":
+            return root.passGenPresets;
+        case "vpn":
+            return VpnServers.query(text);
+        default:
+            return Apps.search(text);
+        }
+    }
+
+    model: ScriptModel {
+        values: root.resultsForText(root.displayText)
+        onValuesChanged: root.currentIndex = 0
+    }
+
+    spacing: Tokens.spacing.small
+    orientation: Qt.Vertical
+    implicitHeight: (Tokens.sizes.launcher.itemHeight + spacing) * Math.min(Config.launcher.maxShown, count) - spacing
+
+    preferredHighlightBegin: 0
+    preferredHighlightEnd: height
+    highlightRangeMode: ListView.ApplyRange
+
+    highlightFollowsCurrentItem: false
+    highlight: StyledRect {
+        radius: Tokens.rounding.large
+        color: Colours.palette.m3onSurface
+        opacity: 0.08
+
+        y: root.currentItem?.y ?? 0
+        implicitWidth: root.width
+        implicitHeight: root.currentItem?.implicitHeight ?? 0
+
+        Behavior on y {
+            Anim {}
+        }
+    }
+
+    state: screenState.launcher ? requestedState : displayState
+
     onStateChanged: {
         if (state === "scheme" || state === "variant")
             Schemes.reload();
@@ -69,12 +97,13 @@ StyledListView {
             VpnServers.reload();
     }
 
+    Component.onCompleted: displayText = search.text
+
     states: [
         State {
             name: "apps"
 
             PropertyChanges {
-                model.values: Apps.search(search.text)
                 root.delegate: appItem
             }
         },
@@ -82,7 +111,6 @@ StyledListView {
             name: "actions"
 
             PropertyChanges {
-                model.values: Actions.query(search.text)
                 root.delegate: actionItem
             }
         },
@@ -90,7 +118,6 @@ StyledListView {
             name: "calc"
 
             PropertyChanges {
-                model.values: [0]
                 root.delegate: calcItem
             }
         },
@@ -98,7 +125,6 @@ StyledListView {
             name: "scheme"
 
             PropertyChanges {
-                model.values: Schemes.query(search.text)
                 root.delegate: schemeItem
             }
         },
@@ -106,7 +132,6 @@ StyledListView {
             name: "variant"
 
             PropertyChanges {
-                model.values: M3Variants.query(search.text)
                 root.delegate: variantItem
             }
         },
@@ -114,7 +139,6 @@ StyledListView {
             name: "passgen"
 
             PropertyChanges {
-                model.values: ["main", "uuid", "hex 32", "base64 32", "pin 6", "password 32 -ns", "alpha 32"]
                 root.delegate: passGenItem
             }
         },
@@ -122,7 +146,6 @@ StyledListView {
             name: "vpn"
 
             PropertyChanges {
-                model.values: VpnServers.query(search.text)
                 root.delegate: vpnItem
             }
         }
@@ -136,21 +159,29 @@ StyledListView {
                     property: "opacity"
                     from: 1
                     to: 0
-                    duration: Appearance.anim.durations.small
-                    easing.bezierCurve: Appearance.anim.curves.standardAccel
+                    duration: Tokens.anim.durations.small
+                    easing: Tokens.anim.standardAccel
                 }
                 Anim {
                     target: root
                     property: "scale"
                     from: 1
                     to: 0.9
-                    duration: Appearance.anim.durations.small
-                    easing.bezierCurve: Appearance.anim.curves.standardAccel
+                    duration: Tokens.anim.durations.small
+                    easing: Tokens.anim.standardAccel
                 }
             }
             PropertyAction {
-                targets: [model, root]
-                properties: "values,delegate"
+                target: root
+                property: "delegate"
+                value: null
+            }
+            ScriptAction {
+                script: root.displayText = root.search.text
+            }
+            PropertyAction {
+                target: root
+                property: "delegate"
             }
             ParallelAnimation {
                 Anim {
@@ -158,16 +189,16 @@ StyledListView {
                     property: "opacity"
                     from: 0
                     to: 1
-                    duration: Appearance.anim.durations.small
-                    easing.bezierCurve: Appearance.anim.curves.standardDecel
+                    duration: Tokens.anim.durations.small
+                    easing: Tokens.anim.standardDecel
                 }
                 Anim {
                     target: root
                     property: "scale"
                     from: 0.9
                     to: 1
-                    duration: Appearance.anim.durations.small
-                    easing.bezierCurve: Appearance.anim.curves.standardDecel
+                    duration: Tokens.anim.durations.small
+                    easing: Tokens.anim.standardDecel
                 }
             }
             PropertyAction {
@@ -186,7 +217,8 @@ StyledListView {
         enabled: !root.state
 
         Anim {
-            properties: "opacity,scale"
+            type: Anim.DefaultEffects
+            property: "opacity"
             from: 0
             to: 1
         }
@@ -196,7 +228,8 @@ StyledListView {
         enabled: !root.state
 
         Anim {
-            properties: "opacity,scale"
+            type: Anim.DefaultEffects
+            property: "opacity"
             from: 1
             to: 0
         }
@@ -207,7 +240,8 @@ StyledListView {
             property: "y"
         }
         Anim {
-            properties: "opacity,scale"
+            type: Anim.DefaultEffects
+            property: "opacity"
             to: 1
         }
     }
@@ -215,10 +249,11 @@ StyledListView {
     addDisplaced: Transition {
         Anim {
             property: "y"
-            duration: Appearance.anim.durations.small
+            type: Anim.StandardSmall
         }
         Anim {
-            properties: "opacity,scale"
+            type: Anim.DefaultEffects
+            property: "opacity"
             to: 1
         }
     }
@@ -228,7 +263,8 @@ StyledListView {
             property: "y"
         }
         Anim {
-            properties: "opacity,scale"
+            type: Anim.DefaultEffects
+            property: "opacity"
             to: 1
         }
     }
@@ -237,7 +273,7 @@ StyledListView {
         id: appItem
 
         AppItem {
-            visibilities: root.visibilities
+            screenState: root.screenState
         }
     }
 
@@ -287,5 +323,21 @@ StyledListView {
         VpnItem {
             list: root
         }
+    }
+
+    Connections {
+        function onTextChanged() {
+            root.syncDisplayText();
+        }
+
+        target: root.search
+    }
+
+    Connections {
+        function onLauncherChanged() {
+            root.syncDisplayText();
+        }
+
+        target: root.screenState
     }
 }

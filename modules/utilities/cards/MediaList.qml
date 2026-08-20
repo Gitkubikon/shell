@@ -1,355 +1,264 @@
 pragma ComponentBehavior: Bound
 
-import qs.components
-import qs.components.controls
-import qs.components.containers
-import qs.services
-import qs.config
-import qs.utils
-import Caelestia
-import Caelestia.Models
-import Quickshell
-import Quickshell.Widgets
 import QtQuick
 import QtQuick.Layouts
-// ============================
-// OVERFLOW-PROOF EXPANDABLE LIST
-// Key ideas:
-//  1) Only the VIEWPORT animates height (Layout.preferredHeight) and owns clipping.
-//  2) Placeholder is drawn in a dedicated CLIPPED wrapper with height bound to the
-//     viewport's CURRENT animatedHeight (not target), so it can never paint past the bottom.
-//  3) The placeholder slides from TOP -> CENTER immediately, but its y is CLAMPED each frame
-//     against (viewport.animatedHeight - effectiveHeight) so scale/slide can never exceed bounds.
-//  4) We account for SCALE when clamping by using transformOrigin: Item.Top and multiplying height * scale.
-//  5) We avoid anchor churn; positions are computed numerically (x/y), per Qt docs.
-// ============================
+import Quickshell
+import Quickshell.Widgets
+import Caelestia
+import Caelestia.Config
+import Caelestia.Models
+import qs.components
+import qs.components.containers
+import qs.components.controls
+import qs.services
 
+/**
+ * Generic file browser used by the Media card for both screenshots and recordings.
+ * Follows upstream's RecordingList behaviour (FileSystemModel with sortReverse,
+ * animated expand/collapse, animated empty placeholder) but is parameterised so
+ * one component serves both tabs.
+ */
 ColumnLayout {
     id: root
 
     required property var props
-    required property var visibilities
+    required property ScreenState screenState
+    // Display
     required property string title
+    required property string emptyText
+    required property string itemText // Must contain a single %1 for the timestamp
+    required property string emptyIcon
+    // Data
     required property string path
-    required property var nameFilters
-    required property string firstIcon
-    required property var firstApp
-    required property string textPrefix
-    required property string expandedProp
+    required property list<string> nameFilters
+    required property string filePrefix // Filename prefix, e.g. "screenshot"
+    // Actions
+    required property string openIcon
+    required property list<string> openApp
+    required property string confirmDeleteProp // props key holding the pending delete path
+
+    readonly property bool expanded: root.props.mediaListExpanded
 
     spacing: 0
-    // Make parent containers (e.g., Loader) see our live height so overshoot is visible
-    implicitHeight: header.implicitHeight + viewport.animatedHeight
 
-    // ---------- HEADER ----------
     WrapperMouseArea {
-        id: header
         Layout.fillWidth: true
+
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.props[root.expandedProp] = !root.props[root.expandedProp]
+        onClicked: root.props.mediaListExpanded = !root.props.mediaListExpanded
 
         RowLayout {
-            spacing: Appearance.spacing.smaller
+            spacing: Tokens.spacing.medium
 
             MaterialIcon {
                 Layout.alignment: Qt.AlignVCenter
                 text: "list"
-                font.pointSize: Appearance.font.size.large
+                fontStyle: Tokens.font.icon.large
             }
 
             StyledText {
                 Layout.alignment: Qt.AlignVCenter
                 Layout.fillWidth: true
-                text: qsTr(root.title)
-                font.pointSize: Appearance.font.size.normal
+                text: root.title
+                font: Tokens.font.body.medium
             }
 
             IconButton {
-                icon: root.props[root.expandedProp] ? "unfold_less" : "unfold_more"
+                icon: root.expanded ? "unfold_less" : "unfold_more"
                 type: IconButton.Text
                 label.animate: true
-                onClicked: root.props[root.expandedProp] = !root.props[root.expandedProp]
+                onClicked: root.props.mediaListExpanded = !root.props.mediaListExpanded
             }
         }
     }
 
-    // ---------- VIEWPORT (the only resizable, clipping parent) ----------
-    Item {
-        id: viewport
+    StyledListView {
+        id: list
+
+        model: FileSystemModel {
+            path: root.path
+            nameFilters: root.nameFilters
+            sortReverse: true // Names are timestamped, so reverse sort is newest first
+        }
+
         Layout.fillWidth: true
-        Layout.rightMargin: -Appearance.spacing.small
+        Layout.rightMargin: -Tokens.spacing.small
+        implicitHeight: (Tokens.font.body.large.pointSize + Tokens.padding.small) * (root.expanded ? 10 : 3)
         clip: true
-        // Enforce a separate layer to guarantee clipping across z-stacking
-        layer.enabled: true
-        layer.smooth: true
 
-        readonly property real rowHeight: Appearance.font.size.larger + Appearance.padding.small
-        readonly property int collapsedRows: 3
-        readonly property int expandedRows: 10
-        readonly property real targetHeight: rowHeight * (root.props[root.expandedProp] ? expandedRows : collapsedRows)
-        // Keep a separate, animatable height; initialize to target and break binding at startup
-        property real animatedHeight: targetHeight
-        Component.onCompleted: animatedHeight = targetHeight
-
-        onTargetHeightChanged: {
-            // Explicit two-step bounce: hop past the target, then settle back
-            const expanding = targetHeight > animatedHeight;
-            bounceAnim.stop();
-            bounceAnim.overshoot = expanding ? targetHeight * 1.10 : targetHeight * 0.90;
-            bounceAnim.start();
+        StyledScrollBar.vertical: StyledScrollBar {
+            flickable: list
         }
 
-        // Live target toggle (drives immediate slide/scale)
-        property bool expandedTarget: root.props[root.expandedProp]
+        delegate: RowLayout {
+            id: entry
 
-        Layout.preferredHeight: animatedHeight
-        height: animatedHeight
+            required property FileSystemEntry modelData
+            property string baseName
 
-        // Explicit overshoot sequence (works for both expand and collapse)
-        SequentialAnimation {
-            id: bounceAnim
-            property real overshoot: 0
-            running: false
-            alwaysRunToEnd: true
-            NumberAnimation { target: viewport; property: "animatedHeight"; to: bounceAnim.overshoot; duration: 110; easing.type: Easing.OutCubic }
-            NumberAnimation { target: viewport; property: "animatedHeight"; to: viewport.targetHeight; duration: 130; easing.type: Easing.InCubic }
+            anchors.left: list.contentItem.left
+            anchors.right: list.contentItem.right
+            anchors.rightMargin: Tokens.spacing.small
+            spacing: Tokens.spacing.extraSmall
+
+            Component.onCompleted: baseName = modelData.baseName
+
+            StyledText {
+                Layout.fillWidth: true
+                Layout.rightMargin: Tokens.spacing.extraSmall
+                text: {
+                    const name = entry.baseName;
+                    const matches = name.match(new RegExp(`^${root.filePrefix}_(\\d{4})(\\d{2})(\\d{2})_(\\d{2})-(\\d{2})-(\\d{2})`, "i"));
+                    if (!matches)
+                        return name;
+                    const date = new Date(...matches.slice(1));
+                    date.setMonth(date.getMonth() - 1); // Woe (months start from 0)
+                    return root.itemText.arg(Qt.formatDateTime(date, Qt.locale()));
+                }
+                color: Colours.palette.m3onSurfaceVariant
+                elide: Text.ElideRight
+            }
+
+            IconButton {
+                icon: root.openIcon
+                type: IconButton.Text
+                onClicked: {
+                    root.screenState.utilities = false;
+                    root.screenState.sidebar = false;
+                    Quickshell.execDetached([...root.openApp, entry.modelData.path]);
+                }
+            }
+
+            IconButton {
+                icon: "folder"
+                type: IconButton.Text
+                onClicked: {
+                    root.screenState.utilities = false;
+                    root.screenState.sidebar = false;
+                    Quickshell.execDetached([...GlobalConfig.general.apps.explorer, entry.modelData.path]);
+                }
+            }
+
+            IconButton {
+                icon: "delete_forever"
+                type: IconButton.Text
+                label.color: Colours.palette.m3error
+                stateLayer.color: Colours.palette.m3error
+                onClicked: {
+                    if (Config.utilities.confirmDelete)
+                        root.props[root.confirmDeleteProp] = entry.modelData.path;
+                    else
+                        CUtils.deleteFile(Qt.resolvedUrl(entry.modelData.path));
+                }
+            }
         }
 
-        // ---------- LIST ----------
-        StyledListView {
-            id: list
-            anchors.fill: parent
-            clip: true
-
-            property var sourceModel: FileSystemModel {
-                path: root.path
-                nameFilters: root.nameFilters
+        add: Transition {
+            Anim {
+                type: Anim.DefaultEffects
+                property: "opacity"
+                from: 0
+                to: 1
             }
-            
-            property var sortedFiles: []
-            
-            Component.onCompleted: updateSortedFiles()
-            
-            Connections {
-                target: list.sourceModel
-                function onModelAboutToBeReset() { list.updateSortedFiles() }
-                function onModelReset() { list.updateSortedFiles() }
-                function onRowsInserted() { list.updateSortedFiles() }
-                function onRowsRemoved() { list.updateSortedFiles() }
+        }
+
+        remove: Transition {
+            Anim {
+                type: Anim.DefaultEffects
+                property: "opacity"
+                to: 0
             }
-            
-            function updateSortedFiles() {
-                if (!sourceModel) return;
-                
-                let files = [];
-                for (let i = 0; i < sourceModel.rowCount(); i++) {
-                    let index = sourceModel.index(i, 0);
-                    let entry = sourceModel.data(index, Qt.UserRole);
-                    if (entry) {
-                        files.push(entry);
-                    }
-                }
-                
-                // Sort by timestamp first, then by name
-                let timestampPattern = new RegExp(`^${root.textPrefix}_(\\d{4})(\\d{2})(\\d{2})_(\\d{2})-(\\d{2})-(\\d{2})`, "i");
-                
-                files.sort(function(a, b) {
-                    let matchA = timestampPattern.exec(a.baseName || "");
-                    let matchB = timestampPattern.exec(b.baseName || "");
-                    
-                    if (matchA && matchB) {
-                        let timeA = Number(`${matchA[1]}${matchA[2]}${matchA[3]}${matchA[4]}${matchA[5]}${matchA[6]}`);
-                        let timeB = Number(`${matchB[1]}${matchB[2]}${matchB[3]}${matchB[4]}${matchB[5]}${matchB[6]}`);
-                        return timeB - timeA; // Descending order (newest first)
-                    }
-                    
-                    if (matchA && !matchB) return -1;
-                    if (!matchA && matchB) return 1;
-                    
-                    // Fall back to name comparison
-                    let nameA = (a.baseName || "").toLowerCase();
-                    let nameB = (b.baseName || "").toLowerCase();
-                    return nameB.localeCompare(nameA); // Descending order
-                });
-                
-                sortedFiles = files;
+        }
+
+        displaced: Transition {
+            Anim {
+                type: Anim.DefaultEffects
+                property: "opacity"
+                to: 1
             }
+            Anim {
+                property: "y"
+            }
+        }
 
-            model: sortedFiles
+        Loader {
+            asynchronous: true
+            anchors.centerIn: parent
 
-            StyledScrollBar.vertical: StyledScrollBar { flickable: list }
+            opacity: list.count === 0 ? 1 : 0
+            active: opacity > 0
 
-            delegate: RowLayout {
-                id: item
-                required property var modelData
-                property string baseName
+            sourceComponent: ColumnLayout {
+                spacing: Tokens.spacing.small
 
-                anchors.left: list.contentItem.left
-                anchors.right: list.contentItem.right
-                anchors.rightMargin: Appearance.spacing.small
-                spacing: Appearance.spacing.small / 2
+                MaterialIcon {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: root.emptyIcon
+                    color: Colours.palette.m3outline
+                    fontStyle: Tokens.font.icon.extraLarge
 
-                Component.onCompleted: baseName = modelData.baseName || ""
+                    opacity: root.expanded ? 1 : 0
+                    scale: root.expanded ? 1 : 0
+                    Layout.preferredHeight: root.expanded ? implicitHeight : 0
 
-                StyledText {
-                    Layout.fillWidth: true
-                    Layout.rightMargin: Appearance.spacing.small / 2
-                    text: {
-                        const time = item.baseName;
-                        const rx = new RegExp(`^${root.textPrefix}_(\\d{4})(\\d{2})(\\d{2})_(\\d{2})-(\\d{2})-(\\d{2})`);
-                        const m = time.match(rx);
-                        if (!m) return time;
-                        const y = +m[1], mo = (+m[2]) - 1, d = +m[3], hh = +m[4], mm = +m[5], ss = +m[6];
-                        const date = new Date(y, mo, d, hh, mm, ss);
-                        return qsTr(`${root.textPrefix} at %1`).arg(Qt.formatDateTime(date, Qt.locale()));
-                    }
-                    color: Colours.palette.m3onSurfaceVariant
-                    elide: Text.ElideRight
-                }
-
-                IconButton {
-                    icon: root.firstIcon
-                    type: IconButton.Text
-                    onClicked: {
-                        root.visibilities.utilities = false;
-                        root.visibilities.sidebar = false;
-                        Quickshell.execDetached(["app2unit", "--", ...root.firstApp, item.modelData.path]);
-                    }
-                }
-
-                IconButton {
-                    icon: "folder"
-                    type: IconButton.Text
-                    onClicked: {
-                        root.visibilities.utilities = false;
-                        root.visibilities.sidebar = false;
-                        Quickshell.execDetached(["app2unit", "--", ...Config.general.apps.explorer, item.modelData.path]);
-                    }
-                }
-
-                IconButton {
-                    icon: "delete_forever"
-                    type: IconButton.Text
-                    label.color: Colours.palette.m3error
-                    stateLayer.color: Colours.palette.m3error
-                    enabled: true
-                    onClicked: {
-                        if (Config.utilities.confirmDelete) {
-                            root.props[root.textPrefix.toLowerCase() + "ConfirmDelete"] = item.modelData.path;
-                        } else {
-                            CUtils.deleteFile(Qt.resolvedUrl(item.modelData.path));
+                    Behavior on opacity {
+                        Anim {
+                            type: Anim.DefaultEffects
                         }
                     }
+
+                    Behavior on scale {
+                        Anim {}
+                    }
+
+                    Behavior on Layout.preferredHeight {
+                        Anim {}
+                    }
                 }
-            }
 
-            add: Transition { Anim { property: "opacity"; from: 0; to: 1 } Anim { property: "scale"; from: 0.5; to: 1 } }
-            remove: Transition { Anim { property: "opacity"; to: 0 } Anim { property: "scale"; to: 0.5 } }
-            displaced: Transition { Anim { properties: "opacity,scale"; to: 1 } Anim { property: "y" } }
-        }
-
-        // ---------- PSEUDO CONTAINER (TARGET CENTER REFERENCE) ----------
-        Item {
-            id: pseudoContainer
-            width: parent.width
-            height: viewport.targetHeight // center reference independent of current height
-        }
-
-        // ---------- PLACEHOLDER (NO DATA) ----------
-        // Fully isolated wrapper clipped to current viewport height.
-        Item {
-            id: phWrap
-            width: parent.width
-            height: viewport.animatedHeight // HARD bound to current animated height
-            clip: true
-            anchors.top: parent.top
-            z: 10
-            visible: list.count === 0
-            // separate layer to ensure clipping is preserved with z ordering
-            layer.enabled: true
-            layer.smooth: true
-
-            // Which visual style to show
-            readonly property bool showBig: viewport.expandedTarget
-            readonly property bool showSmall: !viewport.expandedTarget
-
-            // Utility to clamp Y using *effective* height (height * scale)
-            function clampedYFor(node, desired) {
-                const effH = node.height * node.scale;
-                const maxY = Math.max(0, phWrap.height - effH);
-                return Math.min(Math.max(0, desired), maxY);
-            }
-
-            // ---- BIG variant ----
-            Item {
-                id: big
-                visible: phWrap.showBig
-                opacity: visible ? 1 : 0
-                // To make scaling grow downward (so bottom clamp is reliable), scale around TOP
-                transformOrigin: Item.Top
-                scale: visible ? 1 : 0.95
-                width: bigCol.implicitWidth
-                height: bigCol.implicitHeight
-                x: Math.max(0, (phWrap.width - width) / 2)
-                
-                // Desired center based on CURRENT animated height to prevent overflow during animation
-                property real desiredCenter: Math.max(0, (viewport.animatedHeight - height) / 2)
-
-                y: phWrap.clampedYFor(big, viewport.expandedTarget ? big.desiredCenter : 0)
-
-                // Keep placeholder animations unchanged (decoupled from heightAnim)
-                Behavior on opacity { Anim { duration: Appearance.anim.durations.expressiveDefaultSpatial; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                Behavior on scale   { Anim { duration: Appearance.anim.durations.expressiveDefaultSpatial; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                // Behavior on y       { Anim { duration: Appearance.anim.durations.expressiveDefaultSpatial * 0.2; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-
-                Column {
-                    id: bigCol
-                    spacing: Appearance.spacing.small
-                    anchors.horizontalCenter: parent.horizontalCenter
+                RowLayout {
+                    spacing: Tokens.spacing.medium
 
                     MaterialIcon {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: root.textPrefix === "Screenshot" ? "image" : "videocam"
+                        Layout.alignment: Qt.AlignHCenter
+                        text: root.emptyIcon
                         color: Colours.palette.m3outline
-                        font.pointSize: Appearance.font.size.extraLarge
+
+                        opacity: root.expanded ? 0 : 1
+                        scale: root.expanded ? 0 : 1
+                        Layout.preferredWidth: root.expanded ? 0 : implicitWidth
+
+                        Behavior on opacity {
+                            Anim {
+                                type: Anim.DefaultEffects
+                            }
+                        }
+
+                        Behavior on scale {
+                            Anim {}
+                        }
+
+                        Behavior on Layout.preferredWidth {
+                            Anim {}
+                        }
                     }
+
                     StyledText {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: qsTr("No %1 found").arg(root.title.toLowerCase())
+                        text: root.emptyText
                         color: Colours.palette.m3outline
                     }
                 }
             }
 
-            // ---- SMALL variant ----
-            Item {
-                id: small
-                visible: phWrap.showSmall
-                opacity: visible ? 1 : 0
-                transformOrigin: Item.Top
-                scale: visible ? 1 : 0.95
-                width: smallRow.implicitWidth
-                height: smallRow.implicitHeight
-                x: Math.max(0, (phWrap.width - width) / 2)
-
-                property real desiredCenter: Math.max(0, (viewport.animatedHeight - height) / 2)
-                y: phWrap.clampedYFor(small, viewport.expandedTarget ? small.desiredCenter : small.desiredCenter)
-
-                // Keep placeholder animations unchanged (decoupled from heightAnim)
-                Behavior on opacity { Anim { duration: Appearance.anim.durations.expressiveDefaultSpatial; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                Behavior on scale   { Anim { duration: Appearance.anim.durations.expressiveDefaultSpatial; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                // Remove Y animation for small variant to eliminate stagger during collapse
-                // Behavior on y       { Anim { duration: heightAnim.duration * 0.6; easing: heightAnim.easing } }
-
-
-                Row {
-                    id: smallRow
-                    spacing: Appearance.spacing.smaller
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    MaterialIcon { text: root.textPrefix === "Screenshot" ? "image" : "videocam"; color: Colours.palette.m3outline }
-                    StyledText   { text: qsTr("No %1").arg(root.title.toLowerCase()); color: Colours.palette.m3outline }
+            Behavior on opacity {
+                Anim {
+                    type: Anim.DefaultEffects
                 }
             }
+        }
+
+        Behavior on implicitHeight {
+            Anim {}
         }
     }
 }

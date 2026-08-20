@@ -1,9 +1,9 @@
-import qs.components
-import qs.services
-import qs.config
-import Quickshell
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
+import Caelestia.Config
+import qs.components
+import qs.services
 
 Item {
     id: root
@@ -14,7 +14,7 @@ Item {
     // Safely handle modelData to prevent errors during transitions
     readonly property string safeModelData: (modelData && typeof modelData === "string") ? modelData : ""
     readonly property bool isPreset: safeModelData !== "main" && safeModelData !== ""
-    readonly property string input: isPreset ? safeModelData : list.search.text.slice(`${Config.launcher.actionPrefix}passgen`.length).trim()
+    readonly property string input: isPreset ? safeModelData : list.search.text.slice(`${GlobalConfig.launcher.actionPrefix}passgen`.length).trim()
 
     property string generated: ""
     property string activeConfig: ""
@@ -22,152 +22,149 @@ Item {
     property int length: 32
 
     readonly property string iconName: {
-        if (type === "uuid") return "fingerprint"
-        if (type === "hex") return "tag"
-        if (type === "pin" || type === "numeric") return "pin"
-        if (type === "base64") return "code"
-        if (type === "alpha") return "abc"
-        return "key"
+        if (type === "uuid")
+            return "fingerprint";
+        if (type === "hex")
+            return "tag";
+        if (type === "pin" || type === "numeric")
+            return "pin";
+        if (type === "base64")
+            return "code";
+        if (type === "alpha")
+            return "abc";
+        return "key";
     }
 
-    function generate() {
-        // If input is empty in main mode, default to standard password
-        let effectiveInput = input
-        // ... rest of generation logic (parts splitting etc) is dependent on effectiveInput which is now safe-ish
-        // But if transition is happening and modelData is object, input depends on search text.
-        // Search text is likely ">passgen " or something.
-        if (!isPreset && input.length === 0) {
-            // Defaults processed below handles empty string ok
-        }
+    function generate(): void {
+        const parts = root.input.split(/\s+/);
 
-        let parts = effectiveInput.split(/\s+/)
+        let newType = "password";
+        let newLength = 32;
+        let noSymbols = false;
+        let noAmbiguous = false;
+        let upper = false;
+        let lower = false;
+        let urlSafe = false;
 
-        let newType = "password"
-        let newLength = 32
-        let noSymbols = false
-        let noAmbiguous = false
-        let upper = false
-        let lower = false
-        let urlSafe = false
-
-        for (let part of parts) {
-            if (part === "") continue;
-            if (part.startsWith("--") || part.startsWith("-")) {
-                let flag = part.replace(/^-+/, "").toLowerCase()
-                if (flag === "no-symbols" || flag === "ns") noSymbols = true
-                else if (flag === "no-ambiguous" || flag === "na") noAmbiguous = true
-                else if (flag === "upper" || flag === "u") upper = true
-                else if (flag === "lower" || flag === "l") lower = true
-                else if (flag === "url-safe" || flag === "s") urlSafe = true
+        for (const part of parts) {
+            if (part === "")
+                continue;
+            if (part.startsWith("-")) {
+                const flag = part.replace(/^-+/, "").toLowerCase();
+                if (flag === "no-symbols" || flag === "ns")
+                    noSymbols = true;
+                else if (flag === "no-ambiguous" || flag === "na")
+                    noAmbiguous = true;
+                else if (flag === "upper" || flag === "u")
+                    upper = true;
+                else if (flag === "lower" || flag === "l")
+                    lower = true;
+                else if (flag === "url-safe" || flag === "s")
+                    urlSafe = true;
             } else if (!isNaN(part)) {
-                newLength = parseInt(part)
+                newLength = parseInt(part);
             } else {
-                let t = part.toLowerCase()
-                if (["hex", "base64", "pin", "numeric", "alpha", "uuid", "password"].includes(t)) {
-                    newType = t
-                }
+                const t = part.toLowerCase();
+                if (["hex", "base64", "pin", "numeric", "alpha", "uuid", "password"].includes(t))
+                    newType = t;
             }
         }
 
-        if (newType === "hex" && !effectiveInput.match(/\b\d+\b/)) newLength = 16
-        if (newType === "uuid") newLength = 36
-        if (newLength < 1) newLength = 1
-        if (newLength > 128) newLength = 128
+        if (newType === "hex" && !root.input.match(/\b\d+\b/))
+            newLength = 16;
+        if (newType === "uuid")
+            newLength = 36;
+        if (newLength < 1)
+            newLength = 1;
+        if (newLength > 128)
+            newLength = 128;
 
-        // Update state
-        root.type = newType
-        root.length = newLength
-        // ... (rest of logic handles generation result)
+        root.type = newType;
+        root.length = newLength;
 
-        let result = ""
+        let result = "";
 
         if (newType === "uuid") {
-            result = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
-                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            result = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                const v = c === "x" ? r : (r & 0x3 | 0x8);
                 return v.toString(16);
             });
-            root.activeConfig = "UUID v4"
+            root.activeConfig = qsTr("UUID v4");
         } else {
-            let chars = ""
+            let chars = "";
             if (newType === "hex") {
-                chars = "0123456789abcdef"
-                root.activeConfig = `Hex (${newLength * 8} bits)`
+                chars = "0123456789abcdef";
+                root.activeConfig = qsTr("Hex (%1 bits)").arg(newLength * 8);
             } else if (newType === "base64") {
-                chars = urlSafe ? "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-                                : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-                root.activeConfig = `Base64${urlSafe ? " (URL safe)" : ""}`
+                chars = urlSafe ? "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                root.activeConfig = urlSafe ? qsTr("Base64 (URL safe)") : qsTr("Base64");
             } else if (newType === "pin" || newType === "numeric") {
-                chars = "0123456789"
-                root.activeConfig = "PIN / Numeric"
+                chars = "0123456789";
+                root.activeConfig = qsTr("PIN / Numeric");
             } else if (newType === "alpha") {
-                chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-                root.activeConfig = "Alphanumeric"
+                chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                root.activeConfig = qsTr("Alphanumeric");
             } else {
-                chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-                if (!noSymbols) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"
-                root.activeConfig = "Password"
+                chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                if (!noSymbols)
+                    chars += "!@#$%^&*()_+-=[]{}|;:,.<>?";
+                root.activeConfig = qsTr("Password");
             }
 
-            if (noAmbiguous) chars = chars.replace(/[0O1lI]/g, "")
-            if (upper) chars = chars.toUpperCase()
-            if (lower) chars = chars.toLowerCase()
+            if (noAmbiguous)
+                chars = chars.replace(/[0O1lI]/g, "");
+            if (upper)
+                chars = chars.toUpperCase();
+            if (lower)
+                chars = chars.toLowerCase();
 
-            chars = Array.from(new Set(chars.split(''))).join('')
+            chars = Array.from(new Set(chars.split(""))).join("");
 
             if (chars.length === 0) {
-                result = "Error: No characters left"
+                result = qsTr("Error: No characters left");
             } else {
-                for (let i = 0; i < newLength; i++) {
-                    result += chars.charAt(Math.floor(Math.random() * chars.length))
-                }
-                if (newType === "base64" && !urlSafe) {
-                    let padding = (4 - (result.length % 4)) % 4
-                    result += "=".repeat(padding)
-                }
+                for (let i = 0; i < newLength; i++)
+                    result += chars.charAt(Math.floor(Math.random() * chars.length));
+                if (newType === "base64" && !urlSafe)
+                    result += "=".repeat((4 - (result.length % 4)) % 4);
             }
         }
 
-        root.generated = result
+        root.generated = result;
     }
-
-    onInputChanged: generate()
-    Component.onCompleted: generate()
-
-    // Using `modelData` changes to trigger regen for presets is safe because they are static
-    onModelDataChanged: generate()
 
     function onClicked(): void {
         Quickshell.execDetached(["wl-copy", root.generated]);
-        // Only close if it's the main item or explicitly requested?
-        // Standard launcher behavior is close on action.
-        root.list.visibilities.launcher = false;
+        root.list.screenState.launcher = false;
     }
 
-    implicitHeight: Config.launcher.sizes.itemHeight
+    onInputChanged: generate()
+    onModelDataChanged: generate()
+    Component.onCompleted: generate()
+
+    implicitHeight: Tokens.sizes.launcher.itemHeight
 
     anchors.left: parent?.left
     anchors.right: parent?.right
 
     StateLayer {
-        radius: Appearance.rounding.normal
-
-        function onClicked(): void {
-            root.onClicked();
-        }
+        radius: Tokens.rounding.large
+        onClicked: root.onClicked()
     }
 
     RowLayout {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        anchors.margins: Appearance.padding.larger
+        anchors.margins: Tokens.padding.medium
 
-        spacing: Appearance.spacing.normal
+        spacing: Tokens.spacing.medium
 
         MaterialIcon {
-            text: root.iconName
-            font.pointSize: Appearance.font.size.extraLarge
             Layout.alignment: Qt.AlignVCenter
+            text: root.iconName
+            fontStyle: Tokens.font.icon.extraLarge
             color: root.isPreset ? Colours.palette.m3onSurfaceVariant : Colours.palette.m3onSurface
         }
 
@@ -177,43 +174,37 @@ Item {
             spacing: 0
 
             StyledText {
-                id: result
-                
-                color: Colours.palette.m3onSurface
-                text: root.generated
-                elide: Text.ElideLeft
-                font.family: Appearance.font.family.mono
-
                 Layout.fillWidth: true
+                text: root.generated
+                color: Colours.palette.m3onSurface
+                font: Tokens.font.mono.medium
+                elide: Text.ElideLeft
             }
 
             StyledText {
-                text: root.isPreset ? `${root.activeConfig} (${root.input})` : `${root.activeConfig} • ${root.generated.length} chars`
-                color: Colours.palette.m3onSurfaceVariant
-                font.pointSize: Appearance.font.size.small
-                elide: Text.ElideRight
                 Layout.fillWidth: true
+                text: root.isPreset ? `${root.activeConfig} (${root.input})` : qsTr("%1 • %2 chars").arg(root.activeConfig).arg(root.generated.length)
+                color: Colours.palette.m3onSurfaceVariant
+                font: Tokens.font.body.small
+                elide: Text.ElideRight
             }
         }
 
         StyledRect {
+            Layout.alignment: Qt.AlignVCenter
+
             color: Colours.palette.m3tertiary
-            radius: Appearance.rounding.normal
+            radius: Tokens.rounding.large
             clip: true
 
-            implicitWidth: (stateLayer.containsMouse ? label.implicitWidth + label.anchors.rightMargin : 0) + icon.implicitWidth + Appearance.padding.normal * 2
-            implicitHeight: Math.max(label.implicitHeight, icon.implicitHeight) + Appearance.padding.small * 2
-
-            Layout.alignment: Qt.AlignVCenter
+            implicitWidth: (stateLayer.containsMouse ? label.implicitWidth + label.anchors.rightMargin : 0) + icon.implicitWidth + Tokens.padding.medium * 2
+            implicitHeight: Math.max(label.implicitHeight, icon.implicitHeight) + Tokens.padding.small
 
             StateLayer {
                 id: stateLayer
 
                 color: Colours.palette.m3onTertiary
-
-                function onClicked(): void {
-                    root.onClicked();
-                }
+                onClicked: root.onClicked()
             }
 
             StyledText {
@@ -221,16 +212,18 @@ Item {
 
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.right: icon.left
-                anchors.rightMargin: Appearance.spacing.small
+                anchors.rightMargin: Tokens.spacing.small
 
                 text: qsTr("Copy")
                 color: Colours.palette.m3onTertiary
-                font.pointSize: Appearance.font.size.normal
+                font: Tokens.font.label.medium
 
                 opacity: stateLayer.containsMouse ? 1 : 0
 
                 Behavior on opacity {
-                    Anim {}
+                    Anim {
+                        type: Anim.DefaultEffects
+                    }
                 }
             }
 
@@ -239,16 +232,16 @@ Item {
 
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.right: parent.right
-                anchors.rightMargin: Appearance.padding.normal
+                anchors.rightMargin: Tokens.padding.medium
 
                 text: "content_copy"
                 color: Colours.palette.m3onTertiary
-                font.pointSize: Appearance.font.size.large
+                fontStyle: Tokens.font.icon.large
             }
 
             Behavior on implicitWidth {
                 Anim {
-                    easing.bezierCurve: Appearance.anim.curves.emphasized
+                    type: Anim.Emphasized
                 }
             }
         }

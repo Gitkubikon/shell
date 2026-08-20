@@ -3,9 +3,9 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Caelestia.Config
 import qs.components
 import qs.services
-import qs.config
 import qs.utils
 
 ColumnLayout {
@@ -18,7 +18,7 @@ ColumnLayout {
 
     readonly property bool isWorkspace: true // Flag for finding workspace children
     // Unanimated prop for others to use as reference
-    readonly property int size: implicitHeight + (hasWindows ? Appearance.padding.small : 0)
+    readonly property int size: implicitHeight + (hasWindows ? Tokens.padding.extraSmall : 0)
 
     readonly property int ws: groupOffset + index + 1
     readonly property bool isOccupied: occupied[ws] ?? false
@@ -29,33 +29,16 @@ ColumnLayout {
 
     spacing: 0
 
-    function toRoman(num) {
-        const romanNumerals = [
-            [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
-            [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
-            [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
-        ];
-        let result = '';
-        for (let i = 0; i < romanNumerals.length; i++) {
-            while (num >= romanNumerals[i][0]) {
-                result += romanNumerals[i][1];
-                num -= romanNumerals[i][0];
-            }
-        }
-        return result;
-    }
-
     StyledText {
         id: indicator
 
         Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
-        Layout.preferredHeight: Config.bar.sizes.innerWidth - Appearance.padding.small * 2
+        Layout.preferredHeight: Tokens.sizes.bar.innerWidth - Tokens.padding.small
 
         animate: true
-        font.pointSize: Appearance.font.size.smaller * 1.05
         text: {
             const ws = Hypr.workspaces.values.find(w => w.id === root.ws);
-            const wsName = !ws || ws.name == root.ws ? root.toRoman(root.ws) : ws.name[0];
+            const wsName = !ws || ws.name == root.ws ? Icons.toRoman(root.ws) : ws.name[0];
             let displayName = wsName.toString();
             if (Config.bar.workspaces.capitalisation.toLowerCase() === "upper") {
                 displayName = displayName.toUpperCase();
@@ -69,6 +52,8 @@ ColumnLayout {
         }
         color: Config.bar.workspaces.occupiedBg || root.isOccupied || root.activeWsId === root.ws ? Colours.palette.m3onSurface : Colours.layer(Colours.palette.m3outlineVariant, 2)
         verticalAlignment: Qt.AlignVCenter
+        // Local: workspace labels are rendered slightly larger (roman numerals)
+        font: Tokens.font.body.builders.small.family(Tokens.font.workspaces).size(Math.round(Tokens.font.body.small.pointSize * 1.05)).build()
     }
 
     Loader {
@@ -78,7 +63,7 @@ ColumnLayout {
 
         Layout.alignment: Qt.AlignHCenter
         Layout.fillHeight: true
-        Layout.topMargin: -Config.bar.sizes.innerWidth / 10
+        Layout.topMargin: -Tokens.sizes.bar.innerWidth / 10
 
         visible: active
         active: root.hasWindows
@@ -91,7 +76,7 @@ ColumnLayout {
                     properties: "scale"
                     from: 0
                     to: 1
-                    easing.bezierCurve: Appearance.anim.curves.standardDecel
+                    easing: Tokens.anim.standardDecel
                 }
             }
 
@@ -99,7 +84,7 @@ ColumnLayout {
                 Anim {
                     properties: "scale"
                     to: 1
-                    easing.bezierCurve: Appearance.anim.curves.standardDecel
+                    easing: Tokens.anim.standardDecel
                 }
                 Anim {
                     properties: "x,y"
@@ -111,7 +96,7 @@ ColumnLayout {
                     values: {
                         const ws = root.ws;
                         const windows = Hypr.toplevels.values.filter(c => c.workspace?.id === ws);
-                        const maxIcons = Config.bar.workspaces.maxWindowIcons;
+                        const maxIcons = root.Config.bar.workspaces.maxWindowIcons;
                         return maxIcons > 0 ? windows.slice(0, maxIcons) : windows;
                     }
                 }

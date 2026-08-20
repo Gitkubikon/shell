@@ -4,8 +4,9 @@ import "./kblayout"
 import QtQuick
 import Quickshell
 import Quickshell.Services.SystemTray
+import Caelestia.Config
 import qs.components
-import qs.config
+import qs.services
 
 Item {
     id: root
@@ -14,16 +15,14 @@ Item {
     readonly property Popout currentPopout: content.children.find(c => c.shouldBeActive) ?? null
     readonly property Item current: currentPopout?.item ?? null
 
-    anchors.centerIn: parent
-
-    implicitWidth: (currentPopout?.implicitWidth ?? 0) + Appearance.padding.large * 2
-    implicitHeight: (currentPopout?.implicitHeight ?? 0) + Appearance.padding.large * 2
+    implicitWidth: (currentPopout?.implicitWidth ?? 0) + Tokens.padding.extraLargeIncreased
+    implicitHeight: (currentPopout?.implicitHeight ?? 0) + Tokens.padding.extraLargeIncreased
 
     Item {
         id: content
 
         anchors.fill: parent
-        anchors.margins: Appearance.padding.large
+        anchors.margins: Tokens.padding.large
 
         Popout {
             name: "activewindow"
@@ -38,15 +37,7 @@ Item {
             name: "network"
             sourceComponent: Network {
                 popouts: root.popouts
-                view: "wireless"
-            }
-        }
-
-        Popout {
-            name: "ethernet"
-            sourceComponent: Network {
-                popouts: root.popouts
-                view: "ethernet"
+                view: Nmcli.activeEthernet ? "ethernet" : "wireless"
             }
         }
 
@@ -113,7 +104,7 @@ Item {
 
         Popout {
             name: "audio"
-            sourceComponent: Audio {
+            sourceComponent: AudioPopout {
                 popouts: root.popouts
             }
         }
@@ -130,7 +121,7 @@ Item {
 
         Repeater {
             model: ScriptModel {
-                values: SystemTray.items.values.filter(i => !Config.bar.tray.hiddenIcons.includes(i.id))
+                values: SystemTray.items.values.filter(i => !GlobalConfig.bar.tray.hiddenIcons.includes(i.id))
             }
 
             Popout {
@@ -171,11 +162,9 @@ Item {
         required property string name
         readonly property bool shouldBeActive: root.popouts.currentName === name
 
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.right: parent.right
+        anchors.centerIn: parent
 
         opacity: 0
-        scale: 0.8
         active: false
 
         states: State {
@@ -185,7 +174,6 @@ Item {
             PropertyChanges {
                 popout.active: true
                 popout.opacity: 1
-                popout.scale: 1
             }
         }
 
@@ -196,11 +184,10 @@ Item {
 
                 SequentialAnimation {
                     Anim {
-                        properties: "opacity,scale"
-                        duration: Appearance.anim.durations.small
+                        property: "opacity"
+                        type: Anim.DefaultEffects
                     }
                     PropertyAction {
-                        target: popout
                         property: "active"
                     }
                 }
@@ -211,11 +198,11 @@ Item {
 
                 SequentialAnimation {
                     PropertyAction {
-                        target: popout
                         property: "active"
                     }
                     Anim {
-                        properties: "opacity,scale"
+                        property: "opacity"
+                        type: Anim.SlowEffects
                     }
                 }
             }

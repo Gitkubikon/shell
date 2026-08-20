@@ -4,10 +4,9 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
+import Caelestia.Config
 import qs.components
-import qs.components.effects
 import qs.services
-import qs.config
 import qs.utils
 
 Item {
@@ -15,34 +14,40 @@ Item {
 
     required property ShellScreen screen
     readonly property HyprlandMonitor monitor: Hypr.monitorFor(screen)
-    readonly property string activeSpecial: (Config.bar.workspaces.perMonitorWorkspaces ? monitor : Hypr.focusedMonitor)?.lastIpcObject.specialWorkspace?.name ?? ""
+    readonly property string activeSpecial: (GlobalConfig.bar.workspaces.perMonitorWorkspaces ? monitor : Hypr.focusedMonitor)?.lastIpcObject.specialWorkspace?.name ?? ""
 
     ListView {
         id: view
 
         anchors.fill: parent
-        spacing: Math.floor(Appearance.spacing.small / 2)
+        spacing: Tokens.spacing.extraSmall
         interactive: false
 
         currentIndex: model.values.findIndex(w => w.name === root.activeSpecial)
         onCurrentIndexChanged: currentIndex = Qt.binding(() => model.values.findIndex(w => w.name === root.activeSpecial))
 
+        // Local: sort special workspaces by their numeric suffix so the order is stable
         model: ScriptModel {
-            values: Hypr.workspaces.values.filter(w => w.name.startsWith("special:") && (!Config.bar.workspaces.perMonitorWorkspaces || w.monitor === root.monitor)).sort((a, b) => {
+            values: Hypr.workspaces.values.filter(w => w.name.startsWith("special:") && (!GlobalConfig.bar.workspaces.perMonitorWorkspaces || w.monitor === root.monitor)).sort((a, b) => {
                 const aNum = parseInt(a.name.slice(8));
                 const bNum = parseInt(b.name.slice(8));
-                if (isNaN(aNum) && isNaN(bNum)) return 0;
-                if (isNaN(aNum)) return 1;
-                if (isNaN(bNum)) return -1;
+                if (isNaN(aNum) && isNaN(bNum))
+                    return 0;
+                if (isNaN(aNum))
+                    return 1;
+                if (isNaN(bNum))
+                    return -1;
                 return aNum - bNum;
             })
         }
 
-        // Disable ListView's built-in highlight animation — we handle it ourselves
+        // Local: the pill highlight is animated by hand, so disable the built in one
         highlightFollowsCurrentItem: false
         highlightMoveDuration: 0
 
         highlight: Config.bar.workspaces.activeIndicator ? highlightComp : null
+
+        delegate: SpecialWsDelegate {}
 
         Component {
             id: highlightComp
@@ -50,151 +55,156 @@ Item {
             StyledRect {
                 // Bind to currentItem position manually for proper easing
                 y: view.currentItem?.y ?? 0
-                implicitWidth: Config.bar.sizes.innerWidth - Appearance.padding.small * 2
+                implicitWidth: Tokens.sizes.bar.innerWidth - Tokens.padding.small
                 implicitHeight: view.currentItem?.implicitHeight ?? 0
-                radius: Appearance.rounding.full
+                radius: Tokens.rounding.full
                 color: Colours.palette.m3primary
                 visible: view.currentIndex >= 0
 
+                // Scale in on first appearance
+                scale: 0
+                Component.onCompleted: scale = 1
+
                 Behavior on y {
                     Anim {
-                        easing.bezierCurve: Appearance.anim.curves.emphasized
+                        type: Anim.Emphasized
                     }
                 }
 
                 Behavior on implicitHeight {
                     Anim {
-                        easing.bezierCurve: Appearance.anim.curves.emphasized
+                        type: Anim.Emphasized
                     }
                 }
 
-                // Scale in on first appearance
-                scale: 0
-                Component.onCompleted: scale = 1
                 Behavior on scale {
                     Anim {
-                        easing.bezierCurve: Appearance.anim.curves.standardDecel
+                        easing: Tokens.anim.standardDecel
                     }
                 }
             }
         }
+    }
 
-        delegate: ColumnLayout {
-            id: ws
+    MouseArea {
+        property real startY
 
-            required property HyprlandWorkspace modelData
-            required property int index
-            readonly property bool isActive: modelData.name === root.activeSpecial
-            readonly property bool isOccupied: modelData.lastIpcObject.windows > 0
-            readonly property bool hasWindows: isOccupied && Config.bar.workspaces.showWindowsOnSpecialWorkspaces
-            readonly property string icon: Icons.getSpecialWsIcon(modelData.name)
+        anchors.fill: view
 
-            anchors.left: view.contentItem.left
-            anchors.right: view.contentItem.right
+        drag.target: view.contentItem
+        drag.axis: Drag.YAxis
+        drag.maximumY: 0
+        drag.minimumY: Math.min(0, view.height - view.contentHeight - Tokens.padding.extraSmall)
 
-            spacing: 0
+        onPressed: event => startY = event.y
 
-            Loader {
-                id: label
+        onClicked: event => {
+            if (Math.abs(event.y - startY) > drag.threshold)
+                return;
 
-                Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
-                Layout.preferredHeight: Config.bar.sizes.innerWidth - Appearance.padding.small * 2
+            const ws = view.itemAt(event.x, event.y) as SpecialWsDelegate;
+            if (ws?.modelData)
+                Hypr.dispatch(Hypr.usingLua ? `hl.dsp.workspace.toggle_special("${ws.modelData.name.slice(8)}")` : `togglespecialworkspace ${ws.modelData.name.slice(8)}`);
+            else
+                Hypr.dispatch(Hypr.usingLua ? 'hl.dsp.workspace.toggle_special("special")' : "togglespecialworkspace special");
+        }
+    }
 
-                sourceComponent: ws.icon.length === 1 ? letterComp : iconComp
+    component SpecialWsDelegate: ColumnLayout {
+        id: ws
 
-                Component {
-                    id: iconComp
+        required property HyprlandWorkspace modelData
 
-                    MaterialIcon {
-                        fill: 1
-                        text: ws.icon
-                        color: ws.isActive && Config.bar.workspaces.activeIndicator
-                            ? Colours.palette.m3onPrimary
-                            : Config.bar.workspaces.occupiedBg || ws.isOccupied
-                                ? Colours.palette.m3onSurface
-                                : Colours.layer(Colours.palette.m3outlineVariant, 2)
-                        verticalAlignment: Qt.AlignVCenter
+        readonly property bool isActive: modelData.name === root.activeSpecial
+        readonly property bool isOccupied: modelData.lastIpcObject.windows > 0
+        readonly property bool hasWindows: isOccupied && Config.bar.workspaces.showWindowsOnSpecialWorkspaces
+        readonly property string icon: Icons.getSpecialWsIcon(modelData.name)
+        readonly property color fgColour: isActive && Config.bar.workspaces.activeIndicator ? Colours.palette.m3onPrimary : Config.bar.workspaces.occupiedBg || isOccupied ? Colours.palette.m3onSurface : Colours.layer(Colours.palette.m3outlineVariant, 2)
 
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: Appearance.anim.durations.normal
-                                easing.bezierCurve: Appearance.anim.curves.emphasized
-                            }
-                        }
-                    }
-                }
+        anchors.left: view.contentItem.left
+        anchors.right: view.contentItem.right
 
-                Component {
-                    id: letterComp
+        spacing: 0
 
-                    StyledText {
-                        font.pointSize: Appearance.font.size.smaller * 0.85
-                        text: ws.icon
-                        color: ws.isActive && Config.bar.workspaces.activeIndicator
-                            ? Colours.palette.m3onPrimary
-                            : Config.bar.workspaces.occupiedBg || ws.isOccupied
-                                ? Colours.palette.m3onSurface
-                                : Colours.layer(Colours.palette.m3outlineVariant, 2)
-                        verticalAlignment: Qt.AlignVCenter
-                        horizontalAlignment: Qt.AlignHCenter
-                        elide: Text.ElideNone
-                        wrapMode: Text.NoWrap
+        Loader {
+            id: label
 
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: Appearance.anim.durations.normal
-                                easing.bezierCurve: Appearance.anim.curves.emphasized
-                            }
-                        }
-                    }
+            Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
+            Layout.preferredHeight: Tokens.sizes.bar.innerWidth - Tokens.padding.small
+
+            sourceComponent: ws.icon.length === 1 ? letterComp : iconComp
+
+            Component {
+                id: iconComp
+
+                MaterialIcon {
+                    fill: 1
+                    text: ws.icon
+                    color: ws.fgColour
+                    verticalAlignment: Qt.AlignVCenter
                 }
             }
 
-            Loader {
-                id: windows
+            Component {
+                id: letterComp
 
-                asynchronous: true
+                StyledText {
+                    font: Tokens.font.body.builders.small.scale(0.85).build()
+                    text: ws.icon
+                    color: ws.fgColour
+                    verticalAlignment: Qt.AlignVCenter
+                    horizontalAlignment: Qt.AlignHCenter
+                    elide: Text.ElideNone
+                    wrapMode: Text.NoWrap
+                }
+            }
+        }
 
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillHeight: true
-                Layout.topMargin: -Config.bar.sizes.innerWidth / 10
+        Loader {
+            id: windows
 
-                visible: active
-                active: ws.hasWindows
+            asynchronous: true
 
-                sourceComponent: Column {
-                    spacing: 0
+            Layout.alignment: Qt.AlignHCenter
+            Layout.fillHeight: true
+            Layout.topMargin: -Tokens.sizes.bar.innerWidth / 10
 
-                    add: Transition {
-                        Anim {
-                            properties: "scale"
-                            from: 0
-                            to: 1
-                            easing.bezierCurve: Appearance.anim.curves.standardDecel
-                        }
+            visible: active
+            active: ws.hasWindows
+
+            // Local: show a dot per window instead of per app icons
+            sourceComponent: Column {
+                spacing: 0
+
+                add: Transition {
+                    Anim {
+                        properties: "scale"
+                        from: 0
+                        to: 1
+                        easing: Tokens.anim.standardDecel
                     }
+                }
 
-                    move: Transition {
-                        Anim {
-                            properties: "scale"
-                            to: 1
-                            easing.bezierCurve: Appearance.anim.curves.standardDecel
-                        }
-                        Anim {
-                            properties: "x,y"
-                        }
+                move: Transition {
+                    Anim {
+                        properties: "scale"
+                        to: 1
+                        easing: Tokens.anim.standardDecel
                     }
+                    Anim {
+                        properties: "x,y"
+                    }
+                }
 
-                    Repeater {
-                        model: ws.modelData.lastIpcObject.windows
+                Repeater {
+                    model: ws.modelData?.lastIpcObject.windows ?? 0
 
-                        delegate: StyledRect {
-                            implicitWidth: 8
-                            implicitHeight: 8
-                            radius: Appearance.rounding.small / 2
-                            color: Colours.palette.m3primary
-                            opacity: 0.6
-                        }
+                    StyledRect {
+                        implicitWidth: 8
+                        implicitHeight: 8
+                        radius: Tokens.rounding.full
+                        color: Colours.palette.m3primary
+                        opacity: 0.6
                     }
                 }
             }

@@ -4,7 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import qs.config
+import Caelestia.Config
 
 /**
  * Calendar service backed by the Caelestia CLI (`caelestia calendar --json`),
@@ -22,7 +22,7 @@ Singleton {
     property var events: []
     property var eventsMap: ({})
 
-    readonly property int refreshIntervalMs: Config.services?.calendarUpdateInterval ?? 300000
+    readonly property int refreshIntervalMs: GlobalConfig.services?.calendarUpdateInterval ?? 300000
 
     Component.onCompleted: {
         // Start initial backend check
@@ -61,17 +61,12 @@ Singleton {
         const startStr = Qt.formatDate(startDate, "yyyy-MM-dd");
         const dayCount = Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1);
 
-        getEventsProcess.command = [
-            "/bin/bash", "-c",
-            "export PATH=$HOME/.local/bin:$PATH; exec caelestia calendar -s " + startStr + " -d " + dayCount.toString() + " --json"
-        ];
+        getEventsProcess.command = ["/bin/bash", "-c", "export PATH=$HOME/.local/bin:$PATH; exec caelestia calendar -s " + startStr + " -d " + dayCount.toString() + " --json"];
         getEventsProcess.running = true;
     }
 
     function sameDay(a, b) {
-        return a.getDate() === b.getDate()
-            && a.getMonth() === b.getMonth()
-            && a.getFullYear() === b.getFullYear();
+        return a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
     }
 
     function colorFromTitle(title) {
@@ -89,8 +84,10 @@ Singleton {
         command: ["/bin/bash", "-c", "export PATH=$HOME/.local/bin:$PATH; exec caelestia calendar -d 1 --json"]
         running: false
         stdout: StdioCollector {}
-        stderr: StdioCollector { id: backendCheckStderr }
-        onExited: (exitCode) => {
+        stderr: StdioCollector {
+            id: backendCheckStderr
+        }
+        onExited: exitCode => {
             root.khalAvailable = (exitCode === 0);
             if (root.khalAvailable) {
                 console.log("[Calendar] CLI backend check succeeded");
@@ -110,6 +107,7 @@ Singleton {
 
     Timer {
         id: backendRetryTimer
+
         interval: 5000  // Retry every 5 seconds
         repeat: true
         onTriggered: {
@@ -182,7 +180,8 @@ Singleton {
                 for (const evt of root.events) {
                     const d = evt.startDate;
                     const key = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
-                    if (!newMap[key]) newMap[key] = [];
+                    if (!newMap[key])
+                        newMap[key] = [];
                     newMap[key].push(evt);
                 }
                 root.eventsMap = newMap;
@@ -199,6 +198,7 @@ Singleton {
 
     Timer {
         id: refreshTimer
+
         interval: root.refreshIntervalMs
         repeat: true
         onTriggered: root.refresh()

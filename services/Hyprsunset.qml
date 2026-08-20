@@ -1,10 +1,10 @@
 pragma Singleton
 
-import qs.config
-import Quickshell
-import Quickshell.Io
-import Quickshell.Hyprland
 import QtQuick
+import Quickshell
+import Quickshell.Hyprland
+import Quickshell.Io
+import Caelestia.Config
 
 /**
  * Simple hyprsunset service with automatic mode.
@@ -13,10 +13,10 @@ import QtQuick
 Singleton {
     id: root
 
-    property string from: Config.services.nightLight.from
-    property string to: Config.services.nightLight.to
-    property bool automatic: Config.services.nightLight.automatic
-    property int colorTemperature: Config.services.nightLight.colorTemperature
+    property string from: GlobalConfig.services.nightLight.from
+    property string to: GlobalConfig.services.nightLight.to
+    property bool automatic: GlobalConfig.services.nightLight.automatic
+    property int colorTemperature: GlobalConfig.services.nightLight.colorTemperature
     property bool shouldBeOn: false
     property bool firstEvaluation: true
     property bool active: false
@@ -50,11 +50,14 @@ Singleton {
         reEvaluate(true);
     }
 
-    Component.onCompleted: reEvaluate(true);
+    Component.onCompleted: reEvaluate(true)
 
     function parseTime(timeString, fallbackHour, fallbackMinute) {
         if (typeof timeString !== "string")
-            return {hour: fallbackHour, minute: fallbackMinute};
+            return {
+                hour: fallbackHour,
+                minute: fallbackMinute
+            };
 
         const parts = timeString.split(":");
         const hour = Number(parts[0]);
@@ -62,7 +65,10 @@ Singleton {
 
         const validHour = Number.isFinite(hour) && hour >= 0 && hour < 24 ? hour : fallbackHour;
         const validMinute = Number.isFinite(minute) && minute >= 0 && minute < 60 ? minute : fallbackMinute;
-        return {hour: validHour, minute: validMinute};
+        return {
+            hour: validHour,
+            minute: validMinute
+        };
     }
 
     function inBetween(t, from, to) {
@@ -174,12 +180,12 @@ Singleton {
 
     // Change temperature when config changes
     Connections {
-        target: Config.services.nightLight
+        target: GlobalConfig.services.nightLight
 
         function onColorTemperatureChanged() {
             if (!root.active)
                 return;
-            Quickshell.execDetached(["hyprctl", "hyprsunset", "temperature", `${Config.services.nightLight.colorTemperature}`]);
+            Quickshell.execDetached(["hyprctl", "hyprsunset", "temperature", `${GlobalConfig.services.nightLight.colorTemperature}`]);
         }
     }
 }

@@ -2,9 +2,9 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
+import Caelestia.Config
 import qs.components
 import qs.services
-import qs.config
 
 Item {
     id: root
@@ -18,12 +18,12 @@ Item {
     function updatePills() {
         if (!occupied)
             return;
-        
+
         let count = 0;
         const newPills = [...pills];
         const start = groupOffset;
         const end = start + Config.bar.workspaces.shown;
-        
+
         for (const [ws, occ] of Object.entries(occupied)) {
             if (ws > start && ws <= end && occ) {
                 const isFirstInGroup = Number(ws) === start + 1;
@@ -41,11 +41,11 @@ Item {
                     newPills[count - 1].end = ws;
             }
         }
-        
+
         if (newPills.length > count) {
             newPills.splice(count, newPills.length - count).forEach(p => p.destroy());
         }
-        
+
         root.pills = newPills;
     }
 
@@ -75,18 +75,18 @@ Item {
             anchors.horizontalCenter: root.horizontalCenter
 
             y: (start?.y ?? 0) - 1
-            implicitWidth: Config.bar.sizes.innerWidth - Appearance.padding.small * 2 + 2
+            implicitWidth: Tokens.sizes.bar.innerWidth - Tokens.padding.small + 2
             implicitHeight: start && end ? end.y + end.size - start.y + 2 : 0
 
             color: Colours.layer(Colours.palette.m3surfaceContainerHigh, 2)
-            radius: Appearance.rounding.full
+            radius: Tokens.rounding.full
 
             scale: 0
             Component.onCompleted: scale = 1
 
             Behavior on scale {
                 Anim {
-                    easing.bezierCurve: Appearance.anim.curves.standardDecel
+                    easing: Tokens.anim.standardDecel
                 }
             }
 

@@ -1,22 +1,20 @@
+import QtQuick
+import QtQuick.Layouts
+import Caelestia.Config
 import qs.components
 import qs.components.controls
 import qs.services
-import qs.config
-import QtQuick
-import QtQuick.Layouts
 
 StyledRect {
     id: root
 
     readonly property int tempMin: 1200
     readonly property int tempMax: 6500
-    readonly property string scheduleText: formatSchedule(Config.services.nightLight.from, Config.services.nightLight.to)
+    readonly property string scheduleText: formatSchedule(GlobalConfig.services.nightLight.from, GlobalConfig.services.nightLight.to)
+    readonly property real nonAnimHeight: layout.implicitHeight + Tokens.padding.extraLargeIncreased
 
     function formatTimeString(timeString: string): string {
-        if (typeof timeString !== "string")
-            return "";
-
-        const parts = timeString.split(":");
+        const parts = (timeString ?? "").split(":");
         const hour = Number(parts[0]);
         const minute = Number(parts[1]);
         if (!Number.isFinite(hour) || !Number.isFinite(minute))
@@ -24,7 +22,7 @@ StyledRect {
 
         const d = new Date();
         d.setHours(hour, minute, 0, 0);
-        return Qt.formatDateTime(d, Config.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm");
+        return Qt.formatDateTime(d, GlobalConfig.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm");
     }
 
     function formatSchedule(fromString: string, toString: string): string {
@@ -36,7 +34,7 @@ StyledRect {
     }
 
     function sliderToTemp(value: real): int {
-        return Math.round(root.tempMax - (value * (root.tempMax - root.tempMin)));
+        return Math.round(root.tempMax - value * (root.tempMax - root.tempMin));
     }
 
     function tempToSlider(temp: int): real {
@@ -44,38 +42,41 @@ StyledRect {
         return (root.tempMax - clamped) / (root.tempMax - root.tempMin);
     }
 
-    Layout.fillWidth: true
-    implicitHeight: layout.implicitHeight + Appearance.padding.large * 2
+    implicitHeight: nonAnimHeight
 
-    radius: Appearance.rounding.normal
+    radius: Tokens.rounding.large
     color: Colours.tPalette.m3surfaceContainer
     clip: true
+
+    Component.onCompleted: Hyprsunset.fetchState()
 
     ColumnLayout {
         id: layout
 
-        anchors.fill: parent
-        anchors.margins: Appearance.padding.large
-        spacing: Appearance.spacing.normal
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: Tokens.padding.large
+        spacing: Tokens.spacing.medium
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: Appearance.spacing.normal
+            spacing: Tokens.spacing.medium
 
             StyledRect {
                 implicitWidth: implicitHeight
-                implicitHeight: icon.implicitHeight + Appearance.padding.smaller * 2
+                implicitHeight: icon.implicitHeight + Tokens.padding.large
 
-                radius: Appearance.rounding.full
+                radius: Tokens.rounding.full
                 color: Hyprsunset.active ? Colours.palette.m3secondary : Colours.palette.m3secondaryContainer
 
                 MaterialIcon {
                     id: icon
 
                     anchors.centerIn: parent
-                    text: Config.services.nightLight.automatic ? "schedule" : "bedtime"
+                    text: GlobalConfig.services.nightLight.automatic ? "schedule" : "bedtime"
                     color: Hyprsunset.active ? Colours.palette.m3onSecondary : Colours.palette.m3onSecondaryContainer
-                    font.pointSize: Appearance.font.size.large
+                    fontStyle: Tokens.font.icon.large
                 }
             }
 
@@ -86,35 +87,37 @@ StyledRect {
                 StyledText {
                     Layout.fillWidth: true
                     text: qsTr("Night Light")
-                    font.pointSize: Appearance.font.size.normal
+                    font: Tokens.font.body.medium
                     elide: Text.ElideRight
                 }
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: qsTr("%1 - %2K - %3")
-                        .arg(Hyprsunset.active ? qsTr("Active now") : qsTr("Off"))
-                        .arg(Config.services.nightLight.colorTemperature)
-                        .arg(root.scheduleText)
+                    text: qsTr("%1 • %2K • %3").arg(Hyprsunset.active ? qsTr("Active now") : qsTr("Off")).arg(GlobalConfig.services.nightLight.colorTemperature).arg(root.scheduleText)
                     color: Colours.palette.m3onSurfaceVariant
-                    font.pointSize: Appearance.font.size.small
+                    font: Tokens.font.body.small
                     elide: Text.ElideRight
+                    animate: true
                 }
             }
 
+            StyledSwitch {
+                checked: Hyprsunset.active
+                onToggled: Hyprsunset.toggle(checked)
+            }
         }
 
         StyledSlider {
             Layout.fillWidth: true
-            Layout.topMargin: Appearance.spacing.small
-            implicitHeight: Appearance.padding.normal * 3
+            Layout.topMargin: Tokens.spacing.small
 
-            from: 0
-            to: 1
-            value: root.tempToSlider(Config.services.nightLight.colorTemperature)
-            onMoved: {
-                const temp = root.sliderToTemp(value);
-                Config.services.nightLight.colorTemperature = temp;
+            implicitHeight: Tokens.padding.medium * 2
+            radius: Tokens.rounding.small
+
+            value: root.tempToSlider(GlobalConfig.services.nightLight.colorTemperature)
+            onInteraction: v => {
+                const temp = root.sliderToTemp(v);
+                GlobalConfig.services.nightLight.colorTemperature = temp;
                 if (temp >= root.tempMax) {
                     if (Hyprsunset.active)
                         Hyprsunset.toggle(false);
@@ -126,12 +129,12 @@ StyledRect {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: -Appearance.spacing.small
+            Layout.topMargin: -Tokens.spacing.small
 
             StyledText {
-                text: `${root.tempMax}K`
+                text: qsTr("%1K").arg(root.tempMax)
                 color: Colours.palette.m3outline
-                font.pointSize: Appearance.font.size.smaller
+                font: Tokens.font.label.small
             }
 
             Item {
@@ -139,37 +142,14 @@ StyledRect {
             }
 
             StyledText {
-                text: `${root.tempMin}K`
+                text: qsTr("%1K").arg(root.tempMin)
                 color: Colours.palette.m3outline
-                font.pointSize: Appearance.font.size.smaller
-            }
-        }
-
-        StyledText {
-            Layout.fillWidth: true
-            Layout.topMargin: Appearance.spacing.small
-            visible: Config.services.nightLight.automatic && Hyprsunset.active
-            text: qsTr("Active from %1 to %2").arg(Config.services.nightLight.from).arg(Config.services.nightLight.to)
-            color: Colours.palette.m3outline
-            font.pointSize: Appearance.font.size.smaller
-            wrapMode: Text.WordWrap
-
-            opacity: Config.services.nightLight.automatic && Hyprsunset.active ? 1 : 0
-
-            Behavior on opacity {
-                Anim {}
+                font: Tokens.font.label.small
             }
         }
     }
 
     Behavior on implicitHeight {
-        Anim {
-            duration: Appearance.anim.durations.expressiveDefaultSpatial
-            easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial
-        }
-    }
-
-    Component.onCompleted: {
-        Hyprsunset.fetchState();
+        Anim {}
     }
 }

@@ -1,9 +1,9 @@
 pragma Singleton
 pragma ComponentBehavior: Bound
 
+import QtQuick
 import Quickshell
 import Quickshell.Io
-import QtQuick
 
 /**
  * For storing sensitive data in the keyring.
@@ -14,20 +14,19 @@ Singleton {
 
     property bool loaded: false
     property var keyringData: ({})
-    
+
     property var properties: {
         "application": "caelestia",
-        "explanation": "For storing API keys and other sensitive information",
+        "explanation": "For storing API keys and other sensitive information"
     }
-    property var propertiesAsArgs: Object.keys(root.properties).reduce(
-        function(arr, key) {
-            return arr.concat([key, root.properties[key]]);
-        }, []
-    )
+    property var propertiesAsArgs: Object.keys(root.properties).reduce(function (arr, key) {
+        return arr.concat([key, root.properties[key]]);
+    }, [])
     property string keyringLabel: "Caelestia Safe Storage"
 
     function setNestedField(path, value) {
-        if (!root.keyringData) root.keyringData = {};
+        if (!root.keyringData)
+            root.keyringData = {};
         let keys = path;
         let obj = root.keyringData;
         let parents = [obj];
@@ -71,34 +70,33 @@ Singleton {
 
     Process {
         id: saveData
-        command: [
-            "secret-tool", "store", "--label=" + keyringLabel,
-            ...propertiesAsArgs,
-        ]
+
+        command: ["secret-tool", "store", "--label=" + keyringLabel, ...propertiesAsArgs,]
         onRunningChanged: {
             if (saveData.running) {
                 // console.log("[KeyringStorage] Saving with command: '" + saveData.command.join("' '") + "'");
                 saveData.write(JSON.stringify(root.keyringData));
-                stdinEnabled = false // End input stream
+                stdinEnabled = false; // End input stream
             }
         }
     }
 
     Process {
         id: getData
+
         command: [ // We need to use echo for a newline so splitparser does parse
-            "bash", "-c", `echo $(secret-tool lookup 'application' 'caelestia')`,
-        ]
+            "bash", "-c", `echo $(secret-tool lookup 'application' 'caelestia')`,]
         stdout: SplitParser {
             onRead: data => {
-                if(data.length === 0) return;
+                if (data.length === 0)
+                    return;
                 try {
                     root.keyringData = JSON.parse(data);
                     // console.log("[KeyringStorage] Keyring data fetched:", JSON.stringify(root.keyringData));
                 } catch (e) {
                     console.error("[KeyringStorage] Failed to get keyring data, reinitializing.");
                     root.keyringData = {};
-                    saveKeyringData()
+                    saveKeyringData();
                 }
             }
         }
@@ -107,10 +105,9 @@ Singleton {
             if (exitCode !== 0) {
                 console.error("[KeyringStorage] Failed to get keyring data, reinitializing.");
                 root.keyringData = {};
-                saveKeyringData()
+                saveKeyringData();
             }
             root.loaded = true;
         }
     }
-    
 }

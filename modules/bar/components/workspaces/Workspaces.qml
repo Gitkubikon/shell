@@ -4,9 +4,9 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
+import Caelestia.Config
 import qs.components
 import qs.services
-import qs.config
 
 StyledClippingRect {
     id: root
@@ -14,8 +14,8 @@ StyledClippingRect {
     required property ShellScreen screen
     required property bool fullscreen
 
-    readonly property bool onSpecial: (Config.bar.workspaces.perMonitorWorkspaces ? Hypr.monitorFor(screen) : Hypr.focusedMonitor)?.lastIpcObject.specialWorkspace?.name !== ""
-    readonly property int activeWsId: Config.bar.workspaces.perMonitorWorkspaces ? (Hypr.monitorFor(screen).activeWorkspace?.id ?? 1) : Hypr.activeWsId
+    readonly property bool onSpecial: (GlobalConfig.bar.workspaces.perMonitorWorkspaces ? Hypr.monitorFor(screen) : Hypr.focusedMonitor)?.lastIpcObject.specialWorkspace?.name !== ""
+    readonly property int activeWsId: GlobalConfig.bar.workspaces.perMonitorWorkspaces ? (Hypr.monitorFor(screen).activeWorkspace?.id ?? 1) : Hypr.activeWsId
 
     readonly property var occupied: {
         const occ = {};
@@ -27,11 +27,11 @@ StyledClippingRect {
 
     property real blur: onSpecial ? 1 : 0
 
-    implicitWidth: Config.bar.sizes.innerWidth
-    implicitHeight: layout.implicitHeight + Appearance.padding.small * 2
+    implicitWidth: Tokens.sizes.bar.innerWidth
+    implicitHeight: layout.implicitHeight + Tokens.padding.small
 
     color: Colours.tPalette.m3surfaceContainer
-    radius: Appearance.rounding.full
+    radius: Tokens.rounding.full
 
     Item {
         anchors.fill: parent
@@ -46,9 +46,11 @@ StyledClippingRect {
             blurMax: 32
         }
 
+        // Local: instantiated directly instead of via an async Loader so the pills
+        // exist as soon as the workspace repeater does (async load raced the repeater)
         OccupiedBg {
             anchors.fill: parent
-            anchors.margins: Appearance.padding.small
+            anchors.margins: Tokens.padding.extraSmall
             visible: Config.bar.workspaces.occupiedBg
 
             workspaces: workspaces
@@ -60,7 +62,7 @@ StyledClippingRect {
             id: layout
 
             anchors.centerIn: parent
-            spacing: Math.floor(Appearance.spacing.small / 2)
+            spacing: Math.floor(Tokens.spacing.extraSmall)
 
             Repeater {
                 id: workspaces
@@ -92,10 +94,12 @@ StyledClippingRect {
             anchors.fill: layout
             onClicked: event => {
                 const ws = (layout.childAt(event.x, event.y) as Workspace)?.ws;
+                if (!ws)
+                    return;
                 if (Hypr.activeWsId !== ws)
-                    Hypr.dispatch(`workspace ${ws}`);
+                    Hypr.dispatch(Hypr.usingLua ? `hl.dsp.focus({ workspace = "${ws}" })` : `workspace ${ws}`);
                 else
-                    Hypr.dispatch("togglespecialworkspace special");
+                    Hypr.dispatch(Hypr.usingLua ? 'hl.dsp.workspace.toggle_special("special")' : "togglespecialworkspace special");
             }
         }
 
@@ -104,7 +108,9 @@ StyledClippingRect {
         }
 
         Behavior on opacity {
-            Anim {}
+            Anim {
+                type: Anim.DefaultEffects
+            }
         }
     }
 
@@ -114,7 +120,7 @@ StyledClippingRect {
         asynchronous: true
 
         anchors.fill: parent
-        anchors.margins: Appearance.padding.small
+        anchors.margins: Tokens.padding.extraSmall
 
         active: opacity > 0
 
@@ -130,13 +136,15 @@ StyledClippingRect {
         }
 
         Behavior on opacity {
-            Anim {}
+            Anim {
+                type: Anim.DefaultEffects
+            }
         }
     }
 
     Behavior on blur {
         Anim {
-            duration: Appearance.anim.durations.small
+            type: Anim.StandardSmall
         }
     }
 }

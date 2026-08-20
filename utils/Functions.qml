@@ -15,13 +15,15 @@ QtObject {
 
     // From FileUtils - remove file:// protocol
     function trimFileProtocol(str) {
-        if (typeof str !== "string") return "";
+        if (typeof str !== "string")
+            return "";
         return String(str).replace(/^file:\/\//, "");
     }
 
     // From ObjectUtils - convert Qt object to plain JS object
     function toPlainObject(qtObj) {
-        if (qtObj === null || typeof qtObj !== "object") return qtObj;
+        if (qtObj === null || typeof qtObj !== "object")
+            return qtObj;
 
         if (Array.isArray(qtObj)) {
             var result = [];

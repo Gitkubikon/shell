@@ -1,9 +1,9 @@
-import "../services"
-import qs.components
-import qs.services
-import qs.config
 import QtQuick
 import QtQuick.Layouts
+import Caelestia.Config
+import qs.components
+import qs.services
+import qs.modules.launcher.services
 
 Item {
     id: root
@@ -16,31 +16,28 @@ Item {
     readonly property string protocol: modelData?.protocol ?? ""
     readonly property bool isVirtual: modelData?.isVirtual ?? false
 
-    implicitHeight: Config.launcher.sizes.itemHeight
+    implicitHeight: Tokens.sizes.launcher.itemHeight
 
     anchors.left: parent?.left
     anchors.right: parent?.right
 
     StateLayer {
-        radius: Appearance.rounding.normal
-
-        function onClicked(): void {
-            root.modelData?.onClicked(root.list);
-        }
+        radius: Tokens.rounding.large
+        onClicked: root.modelData?.onClicked(root.list)
     }
 
     RowLayout {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        anchors.margins: Appearance.padding.larger
+        anchors.margins: Tokens.padding.medium
 
-        spacing: Appearance.spacing.normal
+        spacing: Tokens.spacing.medium
 
         MaterialIcon {
-            text: "vpn_key"
-            font.pointSize: Appearance.font.size.extraLarge
             Layout.alignment: Qt.AlignVCenter
+            text: "vpn_key"
+            fontStyle: Tokens.font.icon.extraLarge
             color: Colours.palette.m3onSurfaceVariant
         }
 
@@ -50,43 +47,47 @@ Item {
             spacing: 0
 
             StyledText {
+                Layout.fillWidth: true
                 text: root.city || root.modelData?.name || ""
                 color: Colours.palette.m3onSurface
-                font.pointSize: Appearance.font.size.normal
+                font: Tokens.font.body.medium
                 elide: Text.ElideRight
-                Layout.fillWidth: true
             }
 
             StyledText {
+                Layout.fillWidth: true
                 text: {
-                    let parts = [];
-                    if (root.country) parts.push(root.country);
-                    if (root.protocol) parts.push(root.protocol);
-                    if (root.isVirtual) parts.push("Virtual");
+                    const parts = [];
+                    if (root.country)
+                        parts.push(root.country);
+                    if (root.protocol)
+                        parts.push(root.protocol);
+                    if (root.isVirtual)
+                        parts.push(qsTr("Virtual"));
                     return parts.join(" • ");
                 }
                 color: Colours.palette.m3onSurfaceVariant
-                font.pointSize: Appearance.font.size.small
+                font: Tokens.font.body.small
                 elide: Text.ElideRight
-                Layout.fillWidth: true
             }
         }
 
         StyledRect {
+            Layout.alignment: Qt.AlignVCenter
+
             visible: root.protocol !== ""
             color: root.protocol === "UDP" ? Colours.palette.m3tertiary : Colours.palette.m3secondaryContainer
-            radius: Appearance.rounding.small
-            implicitWidth: protocolLabel.implicitWidth + Appearance.padding.normal * 2
-            implicitHeight: protocolLabel.implicitHeight + Appearance.padding.small * 2
-            Layout.alignment: Qt.AlignVCenter
+            radius: Tokens.rounding.medium
+            implicitWidth: protocolLabel.implicitWidth + Tokens.padding.medium * 2
+            implicitHeight: protocolLabel.implicitHeight + Tokens.padding.small
 
             StyledText {
                 id: protocolLabel
+
                 anchors.centerIn: parent
                 text: root.protocol
                 color: root.protocol === "UDP" ? Colours.palette.m3onTertiary : Colours.palette.m3onSecondaryContainer
-                font.pointSize: Appearance.font.size.small
-                font.weight: 600
+                font: Tokens.font.label.builders.medium.weight(Font.DemiBold).build()
             }
         }
     }

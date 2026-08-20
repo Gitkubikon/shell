@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Handlers
 
 Item {
     id: root
@@ -13,10 +12,13 @@ Item {
     // expose a cursor shape like MouseArea
     property alias cursorShape: hover.cursorShape
 
-    signal clicked()
+    signal clicked
 
     // Use pointer handlers so child controls remain interactive
-    HoverHandler { id: hover; cursorShape: Qt.ArrowCursor }
+    HoverHandler {
+        id: hover
+        cursorShape: Qt.ArrowCursor
+    }
     TapHandler {
         acceptedButtons: Qt.LeftButton
         onTapped: root.clicked()
@@ -27,6 +29,7 @@ Item {
 
     Item {
         id: contentItem
+
         anchors.fill: parent
     }
 }

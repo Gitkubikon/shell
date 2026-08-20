@@ -5,9 +5,13 @@
 #include <QtQuick/qquickwindow.h>
 #include <qdir.h>
 #include <qfileinfo.h>
-#include <qicon.h>
 #include <qfuturewatcher.h>
+#include <qicon.h>
+#include <qloggingcategory.h>
 #include <qqmlengine.h>
+#include <qregularexpression.h>
+
+Q_LOGGING_CATEGORY(lcCUtils, "caelestia.cutils", QtInfoMsg)
 
 namespace caelestia {
 
@@ -33,17 +37,17 @@ void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QRect& rect, Q
 
 void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QRect& rect, QJSValue onSaved, QJSValue onFailed) {
     if (!target) {
-        qWarning() << "CUtils::saveItem: a target is required";
+        qCWarning(lcCUtils) << "saveItem: a target is required";
         return;
     }
 
     if (!path.isLocalFile()) {
-        qWarning() << "CUtils::saveItem:" << path << "is not a local file";
+        qCWarning(lcCUtils) << "saveItem:" << path << "is not a local file";
         return;
     }
 
     if (!target->window()) {
-        qWarning() << "CUtils::saveItem: unable to save target" << target << "without a window";
+        qCWarning(lcCUtils) << "saveItem: unable to save target" << target << "without a window";
         return;
     }
 
@@ -62,17 +66,14 @@ void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QRect& rect, Q
                     const qreal scaleX = static_cast<qreal>(image.width()) / itemW;
                     const qreal scaleY = static_cast<qreal>(image.height()) / itemH;
 
-                    QRectF rf(rect.left() * scaleX,
-                              rect.top() * scaleY,
-                              rect.width() * scaleX,
-                              rect.height() * scaleY);
+                    QRectF rf(rect.left() * scaleX, rect.top() * scaleY, rect.width() * scaleX, rect.height() * scaleY);
 
                     // Convert to an aligned integer rect and clamp to image bounds
                     QRect crop = rf.toAlignedRect().intersected(image.rect());
                     if (!crop.isEmpty()) {
                         image = image.copy(crop);
                     } else {
-                        qWarning() << "CUtils::saveItem: computed crop rect is empty after scaling";
+                        qCWarning(lcCUtils) << "saveItem: computed crop rect is empty after scaling";
                     }
                 }
 
@@ -94,7 +95,7 @@ void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QRect& rect, Q
                         onSaved.call(args);
                     }
                 } else {
-                    qWarning() << "CUtils::saveItem: failed to save" << path;
+                    qCWarning(lcCUtils) << "saveItem: failed to save" << path;
                     if (onFailed.isCallable()) {
                         if (engine) {
                             onFailed.call({ engine->toScriptValue(QVariant::fromValue(path)) });
@@ -109,19 +110,19 @@ void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QRect& rect, Q
         });
 }
 
-bool CUtils::copyFile(const QUrl& source, const QUrl& target, bool overwrite) const {
+bool CUtils::copyFile(const QUrl& source, const QUrl& target, bool overwrite) {
     if (!source.isLocalFile()) {
-        qWarning() << "CUtils::copyFile: source" << source << "is not a local file";
+        qCWarning(lcCUtils) << "copyFile: source" << source << "is not a local file";
         return false;
     }
     if (!target.isLocalFile()) {
-        qWarning() << "CUtils::copyFile: target" << target << "is not a local file";
+        qCWarning(lcCUtils) << "copyFile: target" << target << "is not a local file";
         return false;
     }
 
     if (overwrite && QFile::exists(target.toLocalFile())) {
         if (!QFile::remove(target.toLocalFile())) {
-            qWarning() << "CUtils::copyFile: overwrite was specified but failed to remove" << target.toLocalFile();
+            qCWarning(lcCUtils) << "copyFile: overwrite was specified but failed to remove" << target.toLocalFile();
             return false;
         }
     }
@@ -129,25 +130,25 @@ bool CUtils::copyFile(const QUrl& source, const QUrl& target, bool overwrite) co
     return QFile::copy(source.toLocalFile(), target.toLocalFile());
 }
 
-bool CUtils::deleteFile(const QUrl& path) const {
+bool CUtils::deleteFile(const QUrl& path) {
     if (!path.isLocalFile()) {
-        qWarning() << "CUtils::deleteFile: path" << path << "is not a local file";
+        qCWarning(lcCUtils) << "deleteFile: path" << path << "is not a local file";
         return false;
     }
 
     return QFile::remove(path.toLocalFile());
 }
 
-QString CUtils::toLocalFile(const QUrl& url) const {
+QString CUtils::toLocalFile(const QUrl& url) {
     if (!url.isLocalFile()) {
-        qWarning() << "CUtils::toLocalFile: given url is not a local file" << url;
+        qCWarning(lcCUtils) << "toLocalFile: given url is not a local file" << url;
         return QString();
     }
 
     return url.toLocalFile();
 }
 
-bool CUtils::fileExists(const QUrl& path) const {
+bool CUtils::fileExists(const QUrl& path) {
     if (!path.isValid()) {
         return false;
     }
@@ -160,12 +161,95 @@ bool CUtils::fileExists(const QUrl& path) const {
     return QFileInfo::exists(path.toString());
 }
 
-bool CUtils::themeIconExists(const QString& name) const {
+bool CUtils::themeIconExists(const QString& name) {
     if (name.isEmpty()) {
         return false;
     }
 
     return QIcon::hasThemeIcon(name);
+}
+
+qreal CUtils::clamp(qreal value, qreal min, qreal max) {
+    return qBound(min, value, max);
+}
+
+namespace {
+
+// DFS over the visual item tree (childItems), returning the first descendant matching the predicate. Unlike
+// QObject::findChild, this walks parentItem/childItems relationships so it traverses the QML visual hierarchy.
+template <typename Predicate> QQuickItem* findChildDfs(QQuickItem* root, Predicate&& match) {
+    const auto children = root->childItems();
+    for (QQuickItem* const child : children) {
+        if (match(child)) {
+            return child;
+        }
+        if (QQuickItem* const found = findChildDfs(child, match)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+// DFS over the visual item tree, appending every descendant matching the predicate to out.
+template <typename Predicate> void findChildrenDfs(QQuickItem* root, Predicate&& match, QList<QQuickItem*>& out) {
+    const auto children = root->childItems();
+    for (QQuickItem* const child : children) {
+        if (match(child)) {
+            out.append(child);
+        }
+        findChildrenDfs(child, match, out);
+    }
+}
+
+} // namespace
+
+QQuickItem* CUtils::findChild(QQuickItem* root, const QString& name) {
+    if (!root) {
+        return nullptr;
+    }
+
+    return findChildDfs(root, [&name](const QQuickItem* item) {
+        return item->objectName() == name;
+    });
+}
+
+QList<QQuickItem*> CUtils::findChildren(QQuickItem* root, const QString& name) {
+    QList<QQuickItem*> children;
+    if (root) {
+        findChildrenDfs(
+            root,
+            [&name](const QQuickItem* item) {
+                return item->objectName() == name;
+            },
+            children);
+    }
+    return children;
+}
+
+QList<QQuickItem*> CUtils::findChildrenMatching(QQuickItem* root, const QString& pattern) {
+    QList<QQuickItem*> children;
+    if (root) {
+        const QRegularExpression re(pattern);
+        findChildrenDfs(
+            root,
+            [&re](const QQuickItem* item) {
+                return re.match(item->objectName()).hasMatch();
+            },
+            children);
+    }
+    return children;
+}
+
+#ifndef CAELESTIA_VERSION
+#define CAELESTIA_VERSION ""
+#endif
+
+QString CUtils::version() const {
+    return QStringLiteral(CAELESTIA_VERSION);
+}
+
+QString CUtils::qtVersion() const {
+    return QStringLiteral(QT_VERSION_STR);
 }
 
 } // namespace caelestia

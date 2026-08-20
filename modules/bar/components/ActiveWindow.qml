@@ -1,9 +1,9 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import Caelestia.Config
 import qs.components
 import qs.services
-import qs.config
 import qs.utils
 
 Item {
@@ -27,12 +27,11 @@ Item {
     }
 
     readonly property int maxHeight: {
-        if (!bar || !bar.children)
+        // Local: guard against being evaluated before the bar/entries exist
+        if (!bar?.children)
             return 0;
 
-        const otherModules = bar.children.filter(
-            c => c && c.id && c.item !== this && c.id !== "spacer"
-        );
+        const otherModules = bar.children.filter(c => c?.entryId && c.item !== this && c.entryId !== "spacer");
         const otherHeight = otherModules.reduce((acc, curr) => acc + (curr.item?.nonAnimHeight ?? curr.height), 0);
         // Length - 2 cause repeater counts as a child
         return bar.height - otherHeight - bar.spacing * (bar.children.length - 1) - bar.vPadding * 2;
@@ -91,8 +90,7 @@ Item {
         id: metrics
 
         text: root.windowTitle
-        font.pointSize: Appearance.font.size.smaller
-        font.family: Appearance.font.family.mono
+        font: root.Tokens.font.body.builders.small.letterSpacing(1.4).build()
         elide: Qt.ElideRight
         elideWidth: root.maxHeight - icon.height
 
@@ -105,10 +103,7 @@ Item {
     }
 
     Behavior on implicitHeight {
-        Anim {
-            duration: Appearance.anim.durations.expressiveDefaultSpatial
-            easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial
-        }
+        Anim {}
     }
 
     component Title: StyledText {
@@ -116,19 +111,19 @@ Item {
 
         anchors.horizontalCenter: icon.horizontalCenter
         anchors.top: icon.bottom
-        anchors.topMargin: Appearance.spacing.small
+        anchors.topMargin: Tokens.spacing.small
 
-        font.pointSize: metrics.font.pointSize
-        font.family: metrics.font.family
+        font: metrics.font
         color: root.colour
         opacity: root.current === this ? 1 : 0
+        horizontalAlignment: Text.AlignLeft
 
         transform: [
             Translate {
-                x: Config.bar.activeWindow.inverted ? -text.implicitWidth + text.implicitHeight : 0
+                x: root.Config.bar.activeWindow.inverted ? -text.implicitWidth + text.implicitHeight : 0
             },
             Rotation {
-                angle: Config.bar.activeWindow.inverted ? 270 : 90
+                angle: root.Config.bar.activeWindow.inverted ? 270 : 90
                 origin.x: text.implicitHeight / 2
                 origin.y: text.implicitHeight / 2
             }
@@ -138,7 +133,9 @@ Item {
         height: implicitWidth
 
         Behavior on opacity {
-            Anim {}
+            Anim {
+                type: Anim.DefaultEffects
+            }
         }
     }
 }

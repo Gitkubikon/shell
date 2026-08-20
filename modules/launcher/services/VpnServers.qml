@@ -1,7 +1,7 @@
 pragma Singleton
 
 import ".."
-import qs.config
+import Caelestia.Config
 import qs.utils
 import qs.services
 import Quickshell
@@ -12,7 +12,7 @@ Searcher {
     id: root
 
     function transformSearch(search: string): string {
-        return search.slice(`${Config.launcher.actionPrefix}vpn `.length);
+        return search.slice(`${GlobalConfig.launcher.actionPrefix}vpn `.length);
     }
 
     function selector(item: var): string {
@@ -24,7 +24,7 @@ Searcher {
     }
 
     list: servers.instances
-    useFuzzy: Config.launcher.useFuzzy.vpn
+    useFuzzy: GlobalConfig.launcher.useFuzzy.vpn
     keys: ["name"]
     weights: [1]
 
@@ -84,9 +84,12 @@ Searcher {
                 console.log("[VpnServers] Parsed servers:", list.length);
                 // Sort by country, then city, then protocol (UDP first)
                 servers.model = list.sort((a, b) => {
-                    if (a.country !== b.country) return a.country.localeCompare(b.country);
-                    if (a.city !== b.city) return a.city.localeCompare(b.city);
-                    if (a.protocol !== b.protocol) return b.protocol.localeCompare(a.protocol); // UDP before TCP
+                    if (a.country !== b.country)
+                        return a.country.localeCompare(b.country);
+                    if (a.city !== b.city)
+                        return a.city.localeCompare(b.city);
+                    if (a.protocol !== b.protocol)
+                        return b.protocol.localeCompare(a.protocol); // UDP before TCP
                     return 0;
                 });
                 console.log("[VpnServers] VPN servers loaded:", servers.model.length);
@@ -111,7 +114,7 @@ Searcher {
         readonly property bool isVirtual: modelData.isVirtual || false
 
         function onClicked(list: AppList): void {
-            list.visibilities.launcher = false;
+            list.screenState.launcher = false;
             // Run the connect command similar to CLI
             Quickshell.execDetached(["sh", "-c", `pkexec openvpn --config '${path}' --auth-user-pass '${Paths.home}/.vpn/pass.txt' --daemon < /dev/null`]);
         }

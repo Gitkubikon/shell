@@ -1,240 +1,236 @@
 pragma ComponentBehavior: Bound
 
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Caelestia.Components
+import Caelestia.Config
 import qs.components
 import qs.components.controls
 import qs.services
-import qs.config
 import qs.utils
-import Quickshell
-import QtQuick
-import QtQuick.Layouts
 
+/**
+ * Combined screenshot + recording card. Replaces upstream's Record card: the
+ * recordings tab is a superset of it (same start modes, same live controls) and
+ * the screenshots tab adds a browser for the screenshot directory.
+ */
 StyledRect {
     id: root
 
     required property var props
-    required property var visibilities
+    required property ScreenState screenState
 
-    Layout.fillWidth: true
+    // 0 = screenshots, 1 = recordings
+    property int tabIndex: props.utilitiesMediaTab
+
+    readonly property real nonAnimHeight: btnLayout.implicitHeight + body.implicitHeight + layout.spacing + layout.anchors.margins * 2
+
+    readonly property list<MenuItem> screenshotItems: [
+        MenuItem {
+            icon: "fullscreen"
+            text: qsTr("Screenshot fullscreen")
+            activeText: qsTr("Fullscreen")
+            onClicked: root.exec(["caelestia", "screenshot"], false)
+        },
+        MenuItem {
+            icon: "crop_free"
+            text: qsTr("Screenshot area")
+            activeText: qsTr("Area")
+            onClicked: root.exec(["caelestia", "shell", "picker", "openFreeze"], true)
+        },
+        MenuItem {
+            icon: "web_asset"
+            text: qsTr("Screenshot window")
+            activeText: qsTr("Window")
+            onClicked: root.exec(["caelestia", "shell", "picker", "open"], true)
+        }
+    ]
+
+    readonly property list<MenuItem> recordingItems: [
+        MenuItem {
+            icon: "fullscreen"
+            text: qsTr("Record fullscreen")
+            activeText: qsTr("Fullscreen")
+            onClicked: Recorder.start()
+        },
+        MenuItem {
+            icon: "screenshot_region"
+            text: qsTr("Record region")
+            activeText: qsTr("Region")
+            // Goes through the area picker so the region is scale-correct
+            onClicked: root.exec(["caelestia", "shell", "picker", "openRecord"], true)
+        },
+        MenuItem {
+            icon: "select_to_speak"
+            text: qsTr("Record fullscreen with sound")
+            activeText: qsTr("Fullscreen")
+            onClicked: Recorder.start(["-s"])
+        },
+        MenuItem {
+            icon: "volume_up"
+            text: qsTr("Record region with sound")
+            activeText: qsTr("Region")
+            onClicked: root.exec(["caelestia", "shell", "picker", "openRecordSound"], true)
+        }
+    ]
+
+    /**
+     * Hides the shell then runs cmd. Area based tools need the panels gone
+     * before they grab the screen, so those get a short delay.
+     */
+    function exec(cmd: var, delayed: bool): void {
+        root.screenState.utilities = false;
+        root.screenState.sidebar = false;
+
+        if (delayed) {
+            pendingCommand = cmd;
+            delayTimer.restart();
+        } else {
+            Quickshell.execDetached(cmd);
+        }
+    }
+
+    property var pendingCommand: []
+
+    Timer {
+        id: delayTimer
+
+        interval: 300
+        onTriggered: {
+            if (root.pendingCommand.length > 0) {
+                Quickshell.execDetached(root.pendingCommand);
+                root.pendingCommand = [];
+            }
+        }
+    }
+
     implicitHeight: layout.implicitHeight + layout.anchors.margins * 2
 
-    radius: Appearance.rounding.normal
+    radius: Tokens.rounding.large
     color: Colours.tPalette.m3surfaceContainer
-
-    // 0 = Screenshots, 1 = Recordings
-    property int tabIndex: props.utilitiesMediaTab
-    onTabIndexChanged: tabSwitch.restart()
-
-    property var screenshotMenuItems
-    property var recordingMenuItems
-
-    Component.onCompleted: {
-        // Helper to create screenshot items that hold a stable reference to this card
-        const mkShot = (icon, text, activeText, cmdArray) => {
-            const qml = 'import qs.components.controls; MenuItem { property var mediaRoot; icon: "' + icon + '"; text: qsTr("' + text + '"); activeText: qsTr("' + activeText + '"); onClicked: { if (mediaRoot && mediaRoot.triggerShot) mediaRoot.triggerShot(' + JSON.stringify(cmdArray) + ') } }';
-            const item = Qt.createQmlObject(qml, root);
-            item.mediaRoot = root;
-            return item;
-        }
-        screenshotMenuItems = [
-            mkShot("fullscreen", "Fullscreen", "Fullscreen", ["caelestia", "screenshot"]),
-            mkShot("crop_free", "Area (edit)", "Area", ["caelestia", "shell", "picker", "openFreeze"]),
-            mkShot("web_asset", "Active window (edit)", "Window", ["caelestia", "shell", "picker", "open"])
-        ]
-
-        // Helper to create recording items that call Recorder directly (fullscreen variants)
-        const mkRec = (icon, text, activeText, args) => {
-            const call = args ? 'Recorder.start(' + JSON.stringify(args) + ')' : 'Recorder.start()';
-            const qml = 'import qs.components.controls; import qs.services; MenuItem { icon: "' + icon + '"; text: qsTr("' + text + '"); activeText: qsTr("' + activeText + '"); onClicked: { ' + call + ' } }';
-            return Qt.createQmlObject(qml, root);
-        }
-        // Helper to create region recording items that go through AreaPicker (scale-correct geometry)
-        const mkRecRegion = (icon, text, activeText, withSound) => {
-            const cmd = withSound ? ['caelestia', 'shell', 'picker', 'openRecordSound']
-                                  : ['caelestia', 'shell', 'picker', 'openRecord'];
-            const qml = 'import qs.components.controls; MenuItem { property var mediaRoot; icon: "' + icon + '"; text: qsTr("' + text + '"); activeText: qsTr("' + activeText + '"); onClicked: { if (mediaRoot && mediaRoot.triggerShot) mediaRoot.triggerShot(' + JSON.stringify(cmd) + ') } }';
-            const item = Qt.createQmlObject(qml, root);
-            item.mediaRoot = root;
-            return item;
-        }
-        recordingMenuItems = [
-            mkRec("fullscreen", "Record fullscreen", "Fullscreen", null),
-            mkRecRegion("screenshot_region", "Record region", "Region", false),
-            mkRec("select_to_speak", "Record fullscreen with sound", "Fullscreen", ["-s"]),
-            mkRecRegion("volume_up", "Record region with sound", "Region", true)
-        ]
-    }
 
     ColumnLayout {
         id: layout
 
         anchors.fill: parent
-        anchors.margins: Appearance.padding.large
-        spacing: Appearance.spacing.normal
+        anchors.margins: Tokens.padding.large
+        spacing: Tokens.spacing.medium
 
-        // Header: two icon chips (tabs) + contextual actions on the right
         RowLayout {
-            spacing: Appearance.spacing.normal
+            id: btnLayout
+
+            spacing: Tokens.spacing.medium
             z: 1
 
-            // Screenshot chip (acts as tab toggle)
-            StyledRect {
-                implicitWidth: implicitHeight
-                implicitHeight: {
-                    const h = shotIcon.implicitHeight + Appearance.padding.smaller * 2;
-                    return h - (h % 2);
-                }
-                radius: Appearance.rounding.full
-                color: root.tabIndex === 0 ? Colours.palette.m3secondaryContainer : Colours.layer(Colours.palette.m3surfaceContainerHigh, 1)
-
-                MaterialIcon {
-                    id: shotIcon
-                    anchors.centerIn: parent
-                    anchors.horizontalCenterOffset: -0.5
-                    anchors.verticalCenterOffset: 1.5
-                    text: "screenshot_monitor"
-                    color: root.tabIndex === 0 ? Colours.palette.m3onSecondaryContainer : Colours.palette.m3onSurfaceVariant
-                    font.pointSize: Appearance.font.size.large
-                }
-
-                CustomMouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: { root.tabIndex = 0; root.props.utilitiesMediaTab = 0 }
-                }
+            TabChip {
+                index: 0
+                icon: "screenshot_monitor"
+                active: root.tabIndex === 0
             }
 
-            // Recording chip (acts as tab toggle)
-            StyledRect {
-                implicitWidth: implicitHeight
-                implicitHeight: {
-                    const h = recIcon.implicitHeight + Appearance.padding.smaller * 2;
-                    return h - (h % 2);
-                }
-                radius: Appearance.rounding.full
-                color: root.tabIndex === 1
-                       ? (Recorder.running ? Colours.palette.m3secondary : Colours.palette.m3secondaryContainer)
-                       : Colours.layer(Colours.palette.m3surfaceContainerHigh, 1)
-
-                MaterialIcon {
-                    id: recIcon
-                    anchors.centerIn: parent
-                    anchors.horizontalCenterOffset: -0.5
-                    anchors.verticalCenterOffset: 1.5
-                    text: "screen_record"
-                    color: root.tabIndex === 1
-                           ? (Recorder.running ? Colours.palette.m3onSecondary : Colours.palette.m3onSecondaryContainer)
-                           : Colours.palette.m3onSurfaceVariant
-                    font.pointSize: Appearance.font.size.large
-                }
-
-                CustomMouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: { root.tabIndex = 1; root.props.utilitiesMediaTab = 1 }
-                }
+            TabChip {
+                index: 1
+                icon: "screen_record"
+                active: root.tabIndex === 1
+                recording: Recorder.running
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
 
-            // Contextual action area (SplitButton)
             SplitButton {
-                Layout.leftMargin: Appearance.spacing.normal
-                z: 2
+                Layout.leftMargin: Tokens.spacing.medium
+
                 disabled: root.tabIndex === 1 && Recorder.running
-                active: root.tabIndex === 0 ? (screenshotMenuItems.find(m => root.props.screenshotMode === m.icon + m.text) ?? screenshotMenuItems[0]) : (recordingMenuItems.find(m => root.props.recordingMode === m.icon + m.text) ?? recordingMenuItems[0])
-                menuItems: root.tabIndex === 0 ? screenshotMenuItems : recordingMenuItems
-                menu.onItemSelected: item => root.tabIndex === 0 ? root.props.screenshotMode = item.icon + item.text : root.props.recordingMode = item.icon + item.text
-                stateLayer.disabled: false
+                menuItems: root.tabIndex === 0 ? root.screenshotItems : root.recordingItems
+                active: root.tabIndex === 0 ? (root.screenshotItems.find(m => root.props.screenshotMode === m.icon + m.text) ?? root.screenshotItems[0]) : (root.recordingItems.find(m => root.props.recordingMode === m.icon + m.text) ?? root.recordingItems[0])
+                menu.onItemSelected: item => {
+                    if (root.tabIndex === 0)
+                        root.props.screenshotMode = item.icon + item.text;
+                    else
+                        root.props.recordingMode = item.icon + item.text;
+                }
             }
         }
 
-        // Body: cross-fade between bodies and animate height smoothly
-        Item {
+        Loader {
             id: body
+
+            // 0 = screenshot list, 1 = recording list, 2 = live recording controls
+            property int mode: root.tabIndex === 1 ? (Recorder.running ? 2 : 1) : 0
+
+            asynchronous: true
             Layout.fillWidth: true
-            // Start at the active body's height; animation sequence will adjust when switching
-            Layout.preferredHeight: root.tabIndex === 0 ? shotsBody.implicitHeight : recsBody.implicitHeight
+            Layout.preferredHeight: implicitHeight
+            sourceComponent: mode === 2 ? recordingControls : mode === 1 ? recordingList : screenshotList
+            clip: Layout.preferredHeight < implicitHeight
 
-            // Screenshots
-            Loader {
-                id: shotsBody
-                anchors.fill: parent
-                active: true
-                visible: root.tabIndex === 0
-                opacity: visible ? 1 : 0
-                scale: visible ? 1 : 0.9
-                transformOrigin: Item.Top
-                sourceComponent: screenshotList
-
-                Behavior on opacity { Anim { duration: 250; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                Behavior on scale { Anim { duration: 250; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-            }
-
-            // Recordings container: keep both sub-bodies alive and cross-fade
-            Item {
-                id: recsBody
-                anchors.fill: parent
-                visible: root.tabIndex === 1
-                opacity: visible ? 1 : 0
-                scale: visible ? 1 : 0.9
-                transformOrigin: Item.Top
-                implicitHeight: Math.max(recListLoader.implicitHeight || 0, recCtlLoader.implicitHeight || 0)
-
-                // Recording list
-                Loader {
-                    id: recListLoader
-                    anchors.fill: parent
-                    active: true
-                    visible: !Recorder.running
-                    opacity: visible ? 1 : 0
-                    scale: visible ? 1 : 0.9
-                    transformOrigin: Item.Top
-                    sourceComponent: recordingList
-
-                    Behavior on opacity { Anim { duration: 250; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                    Behavior on scale { Anim { duration: 250; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                }
-
-                // Recording controls
-                Loader {
-                    id: recCtlLoader
-                    anchors.fill: parent
-                    active: true
-                    visible: Recorder.running
-                    opacity: visible ? 1 : 0
-                    scale: visible ? 1 : 0.9
-                    transformOrigin: Item.Top
-                    sourceComponent: recordingControls
-
-                    Behavior on opacity { Anim { duration: 250; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                    Behavior on scale { Anim { duration: 250; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                }
-
-                Behavior on opacity { Anim { duration: 250; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-                Behavior on scale { Anim { duration: 250; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial } }
-            }
             Behavior on Layout.preferredHeight {
-                enabled: false // let inner list drive height; avoid damping overshoot
+                id: bodyHeightAnim
+
+                enabled: false
+
                 Anim {}
+            }
+
+            Behavior on mode {
+                SequentialAnimation {
+                    Anim {
+                        target: body
+                        property: "opacity"
+                        to: 0
+                        type: Anim.DefaultEffects
+                    }
+                    PropertyAction {
+                        target: bodyHeightAnim
+                        property: "enabled"
+                        value: true
+                    }
+                    PropertyAction {}
+                    ParallelAnimation {
+                        SequentialAnimation {
+                            PauseAnimation {
+                                duration: 100
+                            }
+                            PropertyAction {
+                                target: bodyHeightAnim
+                                property: "enabled"
+                                value: false
+                            }
+                        }
+                        Anim {
+                            target: body
+                            property: "opacity"
+                            to: 1
+                            type: Anim.SlowEffects
+                        }
+                    }
+                }
             }
         }
     }
 
-    // --- Bodies ---
     Component {
         id: screenshotList
 
         MediaList {
             props: root.props
-            visibilities: root.visibilities
-            title: "Screenshots"
+            screenState: root.screenState
+
+            title: qsTr("Screenshots")
+            emptyText: qsTr("No screenshots found")
+            itemText: qsTr("Screenshot at %1")
+            emptyIcon: "image"
+
             path: Paths.shotsdir
             nameFilters: ["screenshot_*.png"]
-            firstIcon: "photo_library"
-            firstApp: Config.general.apps.image
-            textPrefix: "Screenshot"
-            expandedProp: "mediaListExpanded"
+            filePrefix: "screenshot"
+
+            openIcon: "photo_library"
+            openApp: GlobalConfig.general.apps.image
+            confirmDeleteProp: "screenshotConfirmDelete"
         }
     }
 
@@ -243,14 +239,20 @@ StyledRect {
 
         MediaList {
             props: root.props
-            visibilities: root.visibilities
-            title: "Recordings"
+            screenState: root.screenState
+
+            title: qsTr("Recordings")
+            emptyText: qsTr("No recordings found")
+            itemText: qsTr("Recording at %1")
+            emptyIcon: "videocam"
+
             path: Paths.recsdir
             nameFilters: ["recording_*.mp4"]
-            firstIcon: "play_arrow"
-            firstApp: Config.general.apps.playback
-            textPrefix: "Recording"
-            expandedProp: "mediaListExpanded"
+            filePrefix: "recording"
+
+            openIcon: "play_arrow"
+            openApp: GlobalConfig.general.apps.playback
+            confirmDeleteProp: "recordingConfirmDelete"
         }
     }
 
@@ -258,14 +260,14 @@ StyledRect {
         id: recordingControls
 
         RowLayout {
-            spacing: Appearance.spacing.normal
+            spacing: Tokens.spacing.medium
 
             StyledRect {
-                radius: Appearance.rounding.full
+                radius: Tokens.rounding.full
                 color: Recorder.paused ? Colours.palette.m3tertiary : Colours.palette.m3error
 
-                implicitWidth: recText.implicitWidth + Appearance.padding.normal * 2
-                implicitHeight: recText.implicitHeight + Appearance.padding.smaller * 2
+                implicitWidth: recText.implicitWidth + Tokens.padding.medium * 2
+                implicitHeight: recText.implicitHeight + Tokens.padding.large
 
                 StyledText {
                     id: recText
@@ -274,22 +276,35 @@ StyledRect {
                     animate: true
                     text: Recorder.paused ? "PAUSED" : "REC"
                     color: Recorder.paused ? Colours.palette.m3onTertiary : Colours.palette.m3onError
-                    font.family: Appearance.font.family.mono
+                    font: Tokens.font.mono.small
                 }
 
-                Behavior on implicitWidth { Anim {} }
+                Behavior on implicitWidth {
+                    Anim {}
+                }
 
                 SequentialAnimation on opacity {
                     running: !Recorder.paused
                     alwaysRunToEnd: true
                     loops: Animation.Infinite
 
-                    Anim { from: 1; to: 0 }
-                    Anim { from: 0; to: 1 }
+                    Anim {
+                        from: 1
+                        to: 0
+                        duration: Tokens.anim.durations.large
+                        easing: Tokens.anim.emphasizedAccel
+                    }
+                    Anim {
+                        from: 0
+                        to: 1
+                        duration: Tokens.anim.durations.extraLarge
+                        easing: Tokens.anim.emphasizedDecel
+                    }
                 }
             }
 
             StyledText {
+                Layout.fillWidth: true
                 text: {
                     const elapsed = Recorder.elapsed;
 
@@ -305,77 +320,90 @@ StyledRect {
 
                     return qsTr("Recording for %1").arg(time);
                 }
-                font.pointSize: Appearance.font.size.normal
+                font: Tokens.font.body.medium
+                elide: Text.ElideMiddle
             }
 
-            Item { Layout.fillWidth: true }
+            ButtonRow {
+                spacing: Tokens.spacing.extraSmall
 
-            IconButton {
-                label.animate: true
-                icon: Recorder.paused ? "play_arrow" : "pause"
-                toggle: true
-                checked: Recorder.paused
-                type: IconButton.Tonal
-                font.pointSize: Appearance.font.size.large
-                onClicked: {
-                    Recorder.togglePause();
-                    internalChecked = Recorder.paused;
+                IconButton {
+                    shapeMorph: true
+                    isRound: true
+                    label.animate: true
+                    icon: Recorder.paused ? "play_arrow" : "pause"
+                    isToggle: true
+                    checked: Recorder.paused
+                    type: IconButton.Tonal
+                    font: Tokens.font.icon.medium
+                    onClicked: {
+                        Recorder.togglePause();
+                        internalChecked = Recorder.paused;
+                    }
+
+                    implicitWidth: {
+                        // Ensure even size so icon is centered properly
+                        const h = label.implicitHeight + Tokens.padding.large * 2;
+                        return h % 2 === 0 ? h : h + 1;
+                    }
+                }
+
+                IconButton {
+                    shapeMorph: true
+                    isRound: true
+                    icon: "stop"
+                    inactiveColour: Colours.palette.m3error
+                    inactiveOnColour: Colours.palette.m3onError
+                    font: Tokens.font.icon.medium
+                    onClicked: Recorder.stop()
+
+                    implicitWidth: {
+                        // Ensure even size so icon is centered properly
+                        const h = label.implicitHeight + Tokens.padding.large * 2;
+                        return h % 2 === 0 ? h : h + 1;
+                    }
                 }
             }
+        }
+    }
 
-            IconButton {
-                icon: "stop"
-                inactiveColour: Colours.palette.m3error
-                inactiveOnColour: Colours.palette.m3onError
-                font.pointSize: Appearance.font.size.large
-                onClicked: Recorder.stop()
+    component TabChip: StyledRect {
+        id: chip
+
+        required property int index
+        required property string icon
+        required property bool active
+        property bool recording
+
+        implicitWidth: implicitHeight
+        implicitHeight: {
+            const h = chipIcon.implicitHeight + Tokens.padding.small * 2;
+            return h - (h % 2);
+        }
+
+        radius: Tokens.rounding.full
+        color: chip.active ? (chip.recording ? Colours.palette.m3secondary : Colours.palette.m3secondaryContainer) : Colours.layer(Colours.palette.m3surfaceContainerHigh, 1)
+
+        StateLayer {
+            onClicked: {
+                root.tabIndex = chip.index;
+                root.props.utilitiesMediaTab = chip.index;
             }
         }
-    }
 
-    // Delayed launch for screenshot tools
-    property var pendingCommand: []
+        MaterialIcon {
+            id: chipIcon
 
-    // Helper so dynamically-created MenuItems can trigger with a delay
-    function triggerShot(cmd) {
-        root.visibilities.utilities = false;
-        root.visibilities.sidebar = false;
-        
-        // Fullscreen screenshots don't need UI close delay - execute immediately
-        if (cmd.length === 2 && cmd[0] === "caelestia" && cmd[1] === "screenshot") {
-            Quickshell.execDetached(cmd);
-        } else {
-            // Area-based screenshots/recordings need delay for UI to close
-            root.pendingCommand = cmd;
-            delayTimer.restart();
+            anchors.centerIn: parent
+            anchors.verticalCenterOffset: 1
+
+            text: chip.icon
+            color: chip.active ? (chip.recording ? Colours.palette.m3onSecondary : Colours.palette.m3onSecondaryContainer) : Colours.palette.m3onSurfaceVariant
+            fontStyle: Tokens.font.icon.large
         }
-    }
 
-    Timer {
-        id: delayTimer
-        interval: 300
-        running: false
-        repeat: false
-        onTriggered: {
-            if (root.pendingCommand.length > 0) {
-                Quickshell.execDetached(root.pendingCommand);
-                root.pendingCommand = [];
-            }
-        }
-    }
-
-    // Smooth switch: animate height, then change visibility to trigger opacity/scale animations.
-    SequentialAnimation {
-        id: tabSwitch
-        running: false
-        alwaysRunToEnd: true
-
-        // Simple height animation for tab switch (no overshoot, let inner list handle its own bounce)
-        Anim { target: body; property: "Layout.preferredHeight"; to: root.tabIndex === 0 ? shotsBody.implicitHeight : recsBody.implicitHeight; duration: 200; easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial }
-
-        onStopped: {
-            shotsBody.visible = root.tabIndex === 0;
-            recsBody.visible = root.tabIndex === 1;
+        Behavior on color {
+            CAnim {}
         }
     }
 }

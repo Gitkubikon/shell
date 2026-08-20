@@ -12,7 +12,7 @@ QtObject {
     function openLauncher(visibilities: var, searchText: string): void {
         root.pendingSearchText = searchText;
         visibilities.launcher = true;
-        Qt.callLater(function() {
+        Qt.callLater(function () {
             root.openWithSearch(searchText);
         });
     }

@@ -3,19 +3,15 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Caelestia
+import Caelestia.Config
 import qs.components
 import qs.components.filedialog
-import qs.config
 import qs.utils
 
 Item {
     id: root
 
-    required property DrawerVisibilities visibilities
-    readonly property bool needsKeyboard: (content.item as Content)?.needsKeyboard ?? false
-    readonly property DashboardState dashState: DashboardState {
-        reloadableId: "dashboardState"
-    }
+    required property ScreenState screenState
     readonly property FileDialog facePicker: FileDialog {
         title: qsTr("Select a profile picture")
         filterLabel: qsTr("Image files")
@@ -28,61 +24,18 @@ Item {
         }
     }
 
-    readonly property real nonAnimHeight: state === "visible" ? ((content.item as Content)?.nonAnimHeight ?? 0) : 0
+    readonly property real nonAnimHeight: (content.item as Content)?.nonAnimHeight ?? 0
+    readonly property bool shouldBeActive: screenState.dashboard && Config.dashboard.enabled
+    property real offsetScale: shouldBeActive ? 0 : 1
 
-    visible: height > 0
-    implicitHeight: 0
-    implicitWidth: content.implicitWidth
+    visible: offsetScale < 1
+    anchors.topMargin: (-implicitHeight - 5) * offsetScale
+    implicitHeight: content.implicitHeight
+    implicitWidth: content.implicitWidth || 854 // Hard coded fallback for first open
+    opacity: 1 - offsetScale
 
-    onStateChanged: {
-        if (state === "visible" && timer.running) {
-            timer.triggered();
-            timer.stop();
-        }
-    }
-
-    states: State {
-        name: "visible"
-        when: root.visibilities.dashboard && Config.dashboard.enabled
-
-        PropertyChanges {
-            root.implicitHeight: content.implicitHeight
-        }
-    }
-
-    transitions: [
-        Transition {
-            from: ""
-            to: "visible"
-
-            Anim {
-                target: root
-                property: "implicitHeight"
-                duration: Appearance.anim.durations.expressiveDefaultSpatial
-                easing.bezierCurve: Appearance.anim.curves.expressiveDefaultSpatial
-            }
-        },
-        Transition {
-            from: "visible"
-            to: ""
-
-            Anim {
-                target: root
-                property: "implicitHeight"
-                easing.bezierCurve: Appearance.anim.curves.emphasized
-            }
-        }
-    ]
-
-    Timer {
-        id: timer
-
-        running: true
-        interval: Appearance.anim.durations.extraLarge
-        onTriggered: {
-            content.active = Qt.binding(() => root.visibilities.dashboard && Config.dashboard.enabled);
-            content.visible = true;
-        }
+    Behavior on offsetScale {
+        Anim {}
     }
 
     Loader {
@@ -91,12 +44,10 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
 
-        visible: false
-        active: true
+        active: root.shouldBeActive || root.visible
 
         sourceComponent: Content {
-            visibilities: root.visibilities
-            dashState: root.dashState
+            screenState: root.screenState
             facePicker: root.facePicker
         }
     }

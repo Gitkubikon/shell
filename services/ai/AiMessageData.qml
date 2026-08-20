@@ -1,4 +1,4 @@
-import QtQuick;
+import QtQuick
 
 /**
  * Represents a message in an AI conversation. (Kind of) follows the OpenAI API message structure.

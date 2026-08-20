@@ -2,7 +2,7 @@ import QtQuick
 
 ApiStrategy {
     property bool isReasoning: false
-    
+
     function buildEndpoint(model: AiModel): string {
         // console.log("[AI] Endpoint: " + model.endpoint);
         return model.endpoint;
@@ -12,27 +12,29 @@ ApiStrategy {
         let baseData = {
             "model": model.model,
             "messages": [
-                {role: "system", content: systemPrompt},
+                {
+                    role: "system",
+                    content: systemPrompt
+                },
                 ...messages.map(message => {
-                    const hasFunctionCall = message.functionCall != undefined && message.functionName.length > 0
+                    const hasFunctionCall = message.functionCall != undefined && message.functionName.length > 0;
                     let messageData = {
                         "role": message.role,
-                        "content": message.rawContent,
-                    }
+                        "content": message.rawContent
+                    };
                     if (hasFunctionCall) {
                         if (message.functionResponse?.length > 0) {
                             messageData.name = message.functionName; // Does the func call also need this name? or just the func output?
                             messageData.role = "tool";
                             messageData.content = message.functionResponse;
-                            messageData.tool_call_id = message.functionCall.id
+                            messageData.tool_call_id = message.functionCall.id;
                         }
                     }
-                    return messageData
-                }),
-            ],
+                    return messageData;
+                }),],
             "stream": true,
             "temperature": temperature,
-            "tools": tools,
+            "tools": tools
         };
         // console.log("[AI] Request data: ", JSON.stringify(baseData, null, 2));
         return model.extraParams ? Object.assign({}, baseData, model.extraParams) : baseData;
@@ -48,18 +50,21 @@ ApiStrategy {
         if (cleanData.startsWith("data:")) {
             cleanData = cleanData.slice(5).trim();
         }
-        
+
         // Handle special cases
-        if (!cleanData || cleanData.startsWith(":")) return {};
+        if (!cleanData || cleanData.startsWith(":"))
+            return {};
         if (cleanData === "[DONE]") {
-            return { finished: true };
+            return {
+                finished: true
+            };
         }
-        
+
         // Real stuff
         try {
             const dataJson = JSON.parse(cleanData);
             let newContent = "";
-            
+
             const responseContent = dataJson.choices[0]?.delta?.content || dataJson.message?.content;
             const responseReasoning = dataJson.choices[0]?.delta?.reasoning || dataJson.choices[0]?.delta?.reasoning_content;
 
@@ -73,8 +78,14 @@ ApiStrategy {
                 message.rawContent += newContent;
                 message.content += newContent;
                 message.functionName = functionName;
-                message.functionCall = functionName; 
-                return { functionCall: { name: functionName, args: functionArgs, id: functionId } };
+                message.functionCall = functionName;
+                return {
+                    functionCall: {
+                        name: functionName,
+                        args: functionArgs,
+                        id: functionId
+                    }
+                };
             }
 
             // Thinking?
@@ -112,24 +123,24 @@ ApiStrategy {
             }
 
             if (`dataJson`.done) {
-                return { finished: true };
+                return {
+                    finished: true
+                };
             }
-            
         } catch (e) {
             console.log("[AI] Mistral: Could not parse line: ", e);
             message.rawContent += line;
             message.content += line;
         }
-        
+
         return {};
     }
-    
+
     function onRequestFinished(message) {
         return {};
     }
-    
+
     function reset() {
         isReasoning = false;
     }
-
 }

@@ -1,4 +1,4 @@
-import QtQuick;
+import QtQuick
 
 /**
  * An AI model representation.
