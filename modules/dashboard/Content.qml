@@ -40,12 +40,6 @@ Item {
                 iconName: "cloud",
                 text: qsTr("Weather"),
                 enabled: Config.dashboard.showWeather
-            },
-            {
-                component: aiComponent,
-                iconName: "smart_toy",
-                text: qsTr("Chat"),
-                enabled: GlobalConfig.ai.enabled
             }
         ];
         return allTabs.filter(tab => tab.enabled);
@@ -185,12 +179,6 @@ Item {
                 id: weatherComponent
 
                 WeatherTab {}
-            }
-
-            Component {
-                id: aiComponent
-
-                AiChat {}
             }
 
             Behavior on contentX {
