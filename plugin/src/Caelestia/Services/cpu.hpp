@@ -1,10 +1,10 @@
 #pragma once
 
-#include "tickingservice.hpp"
-
 #include <qqmlintegration.h>
 
-namespace caelestia::services {
+#include "tickingservice.hpp"
+
+namespace caelestia::shell::services {
 
 class Cpu : public TickingService {
     Q_OBJECT
@@ -45,4 +45,4 @@ private:
     bool m_nameLoaded = false;
 };
 
-} // namespace caelestia::services
+} // namespace caelestia::shell::services

@@ -1,33 +1,25 @@
 #include "tokensattached.hpp"
-#include "anim.hpp"
-#include "appearanceconfig.hpp"
-#include "config.hpp"
-#include "font.hpp"
-#include "monitorconfigmanager.hpp"
-#include "tokens.hpp"
 
 #include <qquickitem.h>
 
-namespace caelestia::config {
+#include "common.hpp"
+
+namespace caelestia::shell::config {
 
 namespace {
 
-const AppearanceConfig* resolveAppearance(GlobalConfig* config, bool complete, const char* prop, QObject* parent) {
+const AppearanceConfig* resolveAppearance(const ConfigRoot* config, bool complete, const char* prop, QObject* parent) {
     if (config)
         return config->appearance();
     if ((complete || !qobject_cast<QQuickItem*>(parent)) && parent)
         qCWarning(lcConfig, "Tokens.%s accessed without a screen set on %s", prop, parent->metaObject()->className());
-    return GlobalConfig::instance()->appearance();
+    return ConfigSingleton::instance()->appearance();
 }
 
 } // namespace
 
 Tokens::Tokens(QObject* parent)
-    : QQuickAttachedPropertyPropagator(parent)
-    , m_font(new FontTokens(this))
-    , m_anim(new AnimTokens(this)) {
-    bindAnim();
-    bindFont();
+    : QQuickAttachedPropertyPropagator(parent) {
     initialize();
 }
 
@@ -51,11 +43,10 @@ void Tokens::inheritScreen(const QString& screen) {
         m_config = nullptr;
         m_tokens = nullptr;
     } else {
-        m_config = MonitorConfigManager::instance()->configForScreen(m_screen);
-        m_tokens = MonitorConfigManager::instance()->tokensForScreen(m_screen);
+        m_config = ConfigSingleton::instance()->forScreen(m_screen);
+        m_tokens = TokensSingleton::instance()->forScreen(m_screen);
     }
 
-    bindFont();
     propagateScreen();
     emit sourceChanged();
 }
@@ -72,19 +63,9 @@ void Tokens::propagateScreen() {
 void Tokens::attachedParentChange(
     QQuickAttachedPropertyPropagator* newParent, QQuickAttachedPropertyPropagator* oldParent) {
     Q_UNUSED(oldParent);
-    auto* const tokens = qobject_cast<Tokens*>(newParent);
+    const auto* tokens = qobject_cast<Tokens*>(newParent);
     if (tokens)
         inheritScreen(tokens->screen());
-}
-
-void Tokens::bindAnim() {
-    m_anim->bindDurations(GlobalConfig::instance()->appearance()->anim()->durations());
-    m_anim->bindCurves(TokenConfig::instance()->appearance()->curves());
-}
-
-void Tokens::bindFont() {
-    auto* appearance = m_config ? m_config->appearance() : GlobalConfig::instance()->appearance();
-    m_font->bindFont(appearance->font());
 }
 
 #define TOKENS_ATTACHED_GETTER(Type, name)                                                                             \
@@ -99,8 +80,8 @@ TOKENS_ATTACHED_GETTER(AppearancePadding, padding)
 
 #undef TOKENS_ATTACHED_GETTER
 
-const AppearanceTransparency* Tokens::transparency() const {
-    return GlobalConfig::instance()->appearance()->transparency(); // Transparency is always global
+const AppearanceTransparency* Tokens::transparency() {
+    return ConfigSingleton::instance()->appearance()->transparency(); // Transparency is always global
 }
 
 const SizeTokens* Tokens::sizes() const {
@@ -108,23 +89,23 @@ const SizeTokens* Tokens::sizes() const {
         return m_tokens->sizes();
     if ((m_complete || !qobject_cast<QQuickItem*>(parent())) && parent())
         qCWarning(lcConfig, "Tokens.sizes accessed without a screen set on %s", parent()->metaObject()->className());
-    return TokenConfig::instance()->sizes();
+    return TokensSingleton::instance()->sizes();
 }
 
 const FontTokens* Tokens::font() const {
-    return m_font;
+    return (m_config ? m_config : ConfigSingleton::instance())->fontTokens();
 }
 
-const AnimTokens* Tokens::anim() const {
-    return m_anim;
+const AnimTokens* Tokens::anim() {
+    return AnimTokens::instance();
 }
 
-TokenConfig* Tokens::forScreen(const QString& screen) {
-    return TokenConfig::forScreen(screen);
+TokensRoot* Tokens::forScreen(const QString& screen) {
+    return TokensSingleton::instance()->forScreen(screen);
 }
 
 Tokens* Tokens::qmlAttachedProperties(QObject* object) {
     return new Tokens(object);
 }
 
-} // namespace caelestia::config
+} // namespace caelestia::shell::config

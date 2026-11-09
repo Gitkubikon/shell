@@ -7,6 +7,7 @@ import Caelestia.Components
 import Caelestia.Config
 import qs.components
 import qs.components.controls
+import qs.components.misc
 import qs.services
 import qs.utils
 
@@ -25,6 +26,12 @@ StyledRect {
     property int tabIndex: props.utilitiesMediaTab
 
     readonly property real nonAnimHeight: btnLayout.implicitHeight + body.implicitHeight + layout.spacing + layout.anchors.margins * 2
+
+    // Keep Recorder polling while this card is visible, so recordings started
+    // elsewhere (keybind, CLI) show up
+    Ref {
+        service: Recorder
+    }
 
     readonly property list<MenuItem> screenshotItems: [
         MenuItem {

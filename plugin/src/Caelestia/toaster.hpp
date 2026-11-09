@@ -1,15 +1,17 @@
 #pragma once
 
+#include <qjsengine.h>
 #include <qobject.h>
+#include <qqmlengine.h>
 #include <qqmlintegration.h>
 #include <qqmllist.h>
 #include <qset.h>
 
-namespace caelestia {
+namespace caelestia::shell {
 
 class Toast : public QObject {
     Q_OBJECT
-    QML_ELEMENT
+    QML_NAMED_ELEMENT(Toast)
     QML_UNCREATABLE("Toast instances can only be retrieved from a Toaster")
 
     Q_PROPERTY(bool closed READ closed NOTIFY closedChanged)
@@ -20,16 +22,15 @@ class Toast : public QObject {
     Q_PROPERTY(Type type READ type CONSTANT)
 
 public:
-    enum class Type {
+    enum class Type : quint8 {
         Info = 0,
         Success,
         Warning,
-        Error
+        Error,
     };
     Q_ENUM(Type)
 
-    explicit Toast(const QString& title, const QString& message, const QString& icon, Type type, int timeout,
-        QObject* parent = nullptr);
+    explicit Toast(QString title, QString message, QString icon, Type type, int timeout, QObject* parent = nullptr);
 
     [[nodiscard]] bool closed() const;
     [[nodiscard]] QString title() const;
@@ -62,21 +63,24 @@ class Toaster : public QObject {
     QML_ELEMENT
     QML_SINGLETON
 
-    Q_PROPERTY(QQmlListProperty<caelestia::Toast> toasts READ toasts NOTIFY toastsChanged)
+    Q_PROPERTY(QQmlListProperty<caelestia::shell::Toast> toasts READ toasts NOTIFY toastsChanged)
 
 public:
-    explicit Toaster(QObject* parent = nullptr);
+    static Toaster* instance();
+    static Toaster* create(QQmlEngine* engine, QJSEngine* jsEngine);
 
     [[nodiscard]] QQmlListProperty<Toast> toasts();
 
-    Q_INVOKABLE void toast(const QString& title, const QString& message, const QString& icon = QString(),
-        caelestia::Toast::Type type = Toast::Type::Info, int timeout = 5000);
+    Q_INVOKABLE void toast(const QString& title, const QString& message, const QString& icon = {},
+        caelestia::shell::Toast::Type type = Toast::Type::Info, int timeout = 5000);
 
 signals:
     void toastsChanged();
 
 private:
+    explicit Toaster(QObject* parent = nullptr);
+
     QList<Toast*> m_toasts;
 };
 
-} // namespace caelestia
+} // namespace caelestia::shell

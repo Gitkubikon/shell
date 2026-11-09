@@ -1,17 +1,18 @@
 #include "appearanceconfig.hpp"
+
 #include "tokens.hpp"
 
-#include <qmetaobject.h>
+namespace caelestia::shell::config {
 
-namespace caelestia::config {
+namespace {
 
 // Helper: connect all changed signals from a token object to a single valuesChanged signal,
 // plus connect the local scaleChanged signal.
-template <typename Source, typename Target> static void connectTokenSignals(Source* source, Target* target) {
+template <typename Source, typename Target> void connectTokenSignals(Source* source, Target* target) {
     const auto* meta = source->metaObject();
 
     for (int i = meta->propertyOffset(); i < meta->propertyCount(); ++i) {
-        auto prop = meta->property(i);
+        const auto prop = meta->property(i);
 
         if (prop.hasNotifySignal())
             QObject::connect(source, prop.notifySignal(), target,
@@ -20,6 +21,8 @@ template <typename Source, typename Target> static void connectTokenSignals(Sour
 
     QObject::connect(target, &Target::scaleChanged, target, &Target::valuesChanged);
 }
+
+} // namespace
 
 // AppearanceRounding
 
@@ -61,7 +64,7 @@ int AppearanceRounding::extraExtraLarge() const {
 }
 
 int AppearanceRounding::full() const {
-    return m_tokens ? static_cast<int>(m_tokens->full()) : 0;
+    return m_tokens ? m_tokens->full() : 0;
 }
 
 // AppearanceSpacing
@@ -142,20 +145,6 @@ int AppearancePadding::extraExtraLarge() const {
     return m_tokens ? static_cast<int>(m_tokens->extraExtraLarge() * m_scale) : 0;
 }
 
-// FontConfig
-
-void FontConfig::setDefaults(int size, int weight, const QVariantMap& vaxes) {
-    m_size = size;
-    m_weight = weight;
-    m_vaxes = vaxes;
-}
-
-// FontStyleConfig
-
-void FontStyleConfig::setDefaultFamily(const QString& family) {
-    m_family = family;
-}
-
 // AnimDurations
 
 void AnimDurations::bindTokens(AnimDurationTokens* tokens) {
@@ -203,4 +192,4 @@ int AnimDurations::expressiveSlowEffects() const {
     return m_tokens ? static_cast<int>(m_tokens->expressiveSlowEffects() * m_scale) : 0;
 }
 
-} // namespace caelestia::config
+} // namespace caelestia::shell::config

@@ -1,14 +1,18 @@
 #include "audioprovider.hpp"
 
-#include "audiocollector.hpp"
-#include "service.hpp"
 #include <qloggingcategory.h>
 #include <qthread.h>
 
-Q_LOGGING_CATEGORY(lcAp, "caelestia.services.ap", QtInfoMsg)
-Q_LOGGING_CATEGORY(lcApProcessor, "caelestia.services.ap.processor", QtInfoMsg)
+#include "audiocollector.hpp"
+#include "service.hpp"
 
-namespace caelestia::services {
+namespace {
+
+Q_LOGGING_CATEGORY(lcAp, "caelestia.services.ap", QtInfoMsg)
+
+} // namespace
+
+namespace caelestia::shell::services {
 
 AudioProcessor::AudioProcessor(QObject* parent)
     : QObject(parent) {}
@@ -19,7 +23,7 @@ AudioProcessor::~AudioProcessor() {
 
 void AudioProcessor::init() {
     m_timer = new QTimer(this);
-    m_timer->setInterval(static_cast<int>(ac::CHUNK_SIZE * 1000.0 / ac::SAMPLE_RATE));
+    m_timer->setInterval(static_cast<int>(ac::k_chunkSize * 1000.0 / ac::k_sampleRate));
     connect(m_timer, &QTimer::timeout, this, &AudioProcessor::process);
 }
 
@@ -78,4 +82,4 @@ void AudioProvider::stop() {
     }
 }
 
-} // namespace caelestia::services
+} // namespace caelestia::shell::services

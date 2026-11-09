@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
+import Caelestia.I18n
 import qs.components
 import qs.components.controls
 import qs.services
@@ -22,7 +23,7 @@ StyledRect {
 
         const d = new Date();
         d.setHours(hour, minute, 0, 0);
-        return Qt.formatDateTime(d, GlobalConfig.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm");
+        return Qt.formatDateTime(d, Units.twelveHourClock ? "hh:mm AP" : "hh:mm");
     }
 
     function formatSchedule(fromString: string, toString: string): string {

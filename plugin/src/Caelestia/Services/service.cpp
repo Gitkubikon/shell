@@ -1,8 +1,6 @@
 #include "service.hpp"
 
-#include <qpointer.h>
-
-namespace caelestia::services {
+namespace caelestia::shell::services {
 
 Service::Service(QObject* parent)
     : QObject(parent) {}
@@ -22,4 +20,4 @@ void Service::unref(QObject* sender) {
     }
 }
 
-} // namespace caelestia::services
+} // namespace caelestia::shell::services

@@ -1,15 +1,15 @@
 #pragma once
 
+#include <qobject.h>
+#include <qqmlintegration.h>
+#include <qvariantmap.h>
+
+#include "settings/objectnode.hpp"
 #include "fontbuilder.hpp"
 
-#include <qqmlintegration.h>
-
-namespace caelestia::config {
+namespace caelestia::shell::config {
 
 class AppearanceFont;
-class FontConfig;
-class FontStyleConfig;
-class IconFontStyleConfig;
 class FontStyleBase;
 class IconFontStyle;
 
@@ -17,9 +17,9 @@ class FontBuilders : public QObject {
     Q_OBJECT
     QML_ANONYMOUS
 
-    Q_PROPERTY(caelestia::config::FontBuilder large READ large NOTIFY buildersChanged FINAL)
-    Q_PROPERTY(caelestia::config::FontBuilder medium READ medium NOTIFY buildersChanged FINAL)
-    Q_PROPERTY(caelestia::config::FontBuilder small READ small NOTIFY buildersChanged FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontBuilder large READ large NOTIFY buildersChanged FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontBuilder medium READ medium NOTIFY buildersChanged FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontBuilder small READ small NOTIFY buildersChanged FINAL)
 
 public:
     explicit FontBuilders(const FontStyleBase* style, QObject* parent = nullptr);
@@ -39,7 +39,7 @@ class IconFontBuilders : public FontBuilders {
     Q_OBJECT
     QML_ANONYMOUS
 
-    Q_PROPERTY(caelestia::config::FontBuilder extraLarge READ extraLarge NOTIFY buildersChanged FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontBuilder extraLarge READ extraLarge NOTIFY buildersChanged FINAL)
 
 public:
     explicit IconFontBuilders(const IconFontStyle* style, QObject* parent = nullptr);
@@ -55,10 +55,9 @@ class FontStyleBase : public QObject {
     Q_PROPERTY(QFont small READ small NOTIFY fontsChanged FINAL)
 
 public:
-    explicit FontStyleBase(QObject* parent = nullptr)
-        : QObject(parent) {}
+    explicit FontStyleBase(QObject* parent = nullptr);
 
-    void bind(FontStyleConfig* cfg);
+    virtual void bind(settings::ObjectNode* cfg);
     void setScale(qreal scale);
 
     [[nodiscard]] QFont large() const;
@@ -71,9 +70,9 @@ signals:
 protected:
     virtual void rebuild();
 
-    static QFont buildFont(const FontConfig* cfg, const QString& fallbackFamily, qreal scale);
+    static QFont buildFont(const settings::ObjectNode* cfg, const QString& fallbackFamily, qreal scale);
 
-    FontStyleConfig* m_cfg = nullptr;
+    settings::ObjectNode* m_cfg = nullptr;
     qreal m_scale = 1;
     QFont m_large;
     QFont m_medium;
@@ -84,7 +83,7 @@ class FontStyle : public FontStyleBase {
     Q_OBJECT
     QML_ANONYMOUS
 
-    Q_PROPERTY(caelestia::config::FontBuilders* builders READ builders CONSTANT FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontBuilders* builders READ builders CONSTANT FINAL)
 
 public:
     explicit FontStyle(QObject* parent = nullptr);
@@ -100,14 +99,14 @@ class IconFontStyle : public FontStyleBase {
     QML_ANONYMOUS
 
     Q_PROPERTY(QFont extraLarge READ extraLarge NOTIFY fontsChanged FINAL)
-    Q_PROPERTY(caelestia::config::IconFontBuilders* builders READ builders CONSTANT FINAL)
+    Q_PROPERTY(caelestia::shell::config::IconFontBuilders* builders READ builders CONSTANT FINAL)
 
 public:
     explicit IconFontStyle(QObject* parent = nullptr);
 
-    Q_INVOKABLE FontBuilder size(int pointSize);
+    Q_INVOKABLE caelestia::shell::config::FontBuilder size(int pointSize);
 
-    void bind(IconFontStyleConfig* cfg);
+    void bind(settings::ObjectNode* cfg) override;
 
     [[nodiscard]] QFont extraLarge() const;
     [[nodiscard]] IconFontBuilders* builders() const;
@@ -124,13 +123,13 @@ class FontTokens : public QObject {
     Q_OBJECT
     QML_ANONYMOUS
 
-    Q_PROPERTY(caelestia::config::FontStyle* headline READ headline CONSTANT FINAL)
-    Q_PROPERTY(caelestia::config::FontStyle* title READ title CONSTANT FINAL)
-    Q_PROPERTY(caelestia::config::FontStyle* body READ body CONSTANT FINAL)
-    Q_PROPERTY(caelestia::config::FontStyle* label READ label CONSTANT FINAL)
-    Q_PROPERTY(caelestia::config::FontStyle* mono READ mono CONSTANT FINAL)
-    Q_PROPERTY(caelestia::config::IconFontStyle* icon READ icon CONSTANT FINAL)
-    Q_PROPERTY(caelestia::config::FontBuilder clock READ clock NOTIFY clockChanged FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontStyle* headline READ headline CONSTANT FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontStyle* title READ title CONSTANT FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontStyle* body READ body CONSTANT FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontStyle* label READ label CONSTANT FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontStyle* mono READ mono CONSTANT FINAL)
+    Q_PROPERTY(caelestia::shell::config::IconFontStyle* icon READ icon CONSTANT FINAL)
+    Q_PROPERTY(caelestia::shell::config::FontBuilder clock READ clock NOTIFY clockChanged FINAL)
     Q_PROPERTY(QString workspaces READ workspaces NOTIFY workspacesChanged FINAL)
 
 public:
@@ -165,4 +164,4 @@ private:
     QFont m_clock;
 };
 
-} // namespace caelestia::config
+} // namespace caelestia::shell::config

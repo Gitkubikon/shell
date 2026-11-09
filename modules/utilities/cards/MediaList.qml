@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Widgets
 import Caelestia
 import Caelestia.Config
+import Caelestia.I18n
 import Caelestia.Models
 import qs.components
 import qs.components.containers

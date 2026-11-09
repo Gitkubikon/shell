@@ -1,13 +1,25 @@
 #include "anim.hpp"
-#include "appearanceconfig.hpp"
-#include "tokens.hpp"
 
 #include <qpoint.h>
+#include <qqmlengine.h>
 
-namespace caelestia::config {
+#include "appearanceconfig.hpp"
+#include "rootnodes.hpp"
+#include "tokens.hpp"
+
+namespace caelestia::shell::config {
 
 AnimTokens::AnimTokens(QObject* parent)
-    : QObject(parent) {}
+    : QObject(parent) {
+    QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
+    bindDurations(ConfigSingleton::instance()->appearance()->anim()->durations());
+    bindCurves(TokensSingleton::instance()->appearance()->curves());
+}
+
+AnimTokens* AnimTokens::instance() {
+    static AnimTokens s_instance;
+    return &s_instance;
+}
 
 QEasingCurve AnimTokens::emphasized() const {
     return m_emphasized;
@@ -68,9 +80,9 @@ QEasingCurve AnimTokens::buildCurve(const QList<qreal>& points) {
     // Each segment needs 3 control points: c1, c2, endPoint.
     // So 6 values per segment: c1x, c1y, c2x, c2y, endX, endY.
     for (int i = 0; i + 5 < points.size(); i += 6) {
-        QPointF c1(points[i], points[i + 1]);
-        QPointF c2(points[i + 2], points[i + 3]);
-        QPointF end(points[i + 4], points[i + 5]);
+        const QPointF c1(points[i], points[i + 1]);
+        const QPointF c2(points[i + 2], points[i + 3]);
+        const QPointF end(points[i + 4], points[i + 5]);
         curve.addCubicBezierSegment(c1, c2, end);
     }
 
@@ -101,7 +113,7 @@ void AnimTokens::bindCurves(AnimCurves* curves) {
     m_curves = curves;
 
     // Rebuild when any curve control points change
-    connect(curves, &AnimCurves::propertiesChanged, this, &AnimTokens::rebuildCurves);
+    connect(curves, &AnimCurves::optionChanged, this, &AnimTokens::rebuildCurves);
 
     rebuildCurves();
 }
@@ -114,4 +126,4 @@ void AnimTokens::bindDurations(AnimDurations* durations) {
     emit durationsChanged();
 }
 
-} // namespace caelestia::config
+} // namespace caelestia::shell::config

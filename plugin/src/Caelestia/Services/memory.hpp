@@ -1,11 +1,11 @@
 #pragma once
 
-#include "tickingservice.hpp"
-
 #include <qqmlintegration.h>
 #include <qvariant.h>
 
-namespace caelestia::services {
+#include "tickingservice.hpp"
+
+namespace caelestia::shell::services {
 
 class Memory : public TickingService {
     Q_OBJECT
@@ -36,4 +36,4 @@ private:
     quint64 m_lastTotal = 0;
 };
 
-} // namespace caelestia::services
+} // namespace caelestia::shell::services

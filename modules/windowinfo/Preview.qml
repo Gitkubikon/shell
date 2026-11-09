@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import Caelestia.Config
+import Caelestia.I18n
 import qs.components
 import qs.services
 
@@ -18,7 +19,7 @@ Item {
     Layout.preferredWidth: preview.implicitWidth + Tokens.padding.extraLargeIncreased
     Layout.fillHeight: true
 
-    StyledClippingRect {
+    ClipRect {
         id: preview
 
         anchors.horizontalCenter: parent.horizontalCenter
@@ -49,14 +50,14 @@ Item {
 
                 StyledText {
                     Layout.alignment: Qt.AlignHCenter
-                    text: qsTr("No active client")
+                    text: Tr.tr("No active client")
                     color: Colours.palette.m3outline
                     font: Tokens.font.body.builders.large.size(28).weight(Font.Medium).build()
                 }
 
                 StyledText {
                     Layout.alignment: Qt.AlignHCenter
-                    text: qsTr("Try switching to a window")
+                    text: Tr.tr("Try switching to a window")
                     color: Colours.palette.m3outline
                     font: Tokens.font.body.large
                 }
@@ -68,7 +69,7 @@ Item {
 
             anchors.centerIn: parent
 
-            captureSource: root.client?.wayland ?? null // qmllint disable unresolved-type
+            captureSource: root.client?.wayland ?? null
             live: true
 
             constraintSize.width: root.client ? parent.height * Math.min(root.screen.width / root.screen.height, root.client?.lastIpcObject.size[0] / root.client?.lastIpcObject.size[1]) : parent.height
@@ -87,10 +88,11 @@ Item {
         text: {
             const client = root.client;
             if (!client)
-                return qsTr("No active client");
+                return Tr.tr("No active client");
 
             const mon = client.monitor;
-            return qsTr("%1 on monitor %2 at %3, %4").arg(client.title).arg(mon.name).arg(client.lastIpcObject.at[0]).arg(client.lastIpcObject.at[1]);
+            // TRANSLATORS: %1 = window title, %2 = monitor name, %3/%4 = x/y position in pixels
+            return Tr.tr("%1 on monitor %2 at %3, %4").arg(client.title).arg(mon.name).arg(client.lastIpcObject.at[0]).arg(client.lastIpcObject.at[1]);
         }
     }
 }

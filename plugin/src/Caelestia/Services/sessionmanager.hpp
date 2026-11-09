@@ -9,7 +9,7 @@
 
 #include <optional>
 
-namespace caelestia::services {
+namespace caelestia::shell::services {
 
 class SessionManager : public QObject {
     Q_OBJECT
@@ -40,8 +40,8 @@ private slots:
     void handleUnlockRequested();
 
 private:
-    [[nodiscard]] std::optional<QDBusConnection> getSystemBus() const;
-    [[nodiscard]] bool queryHibernateAvailable() const;
+    [[nodiscard]] static std::optional<QDBusConnection> getSystemBus();
+    [[nodiscard]] static bool queryHibernateAvailable();
     void call(const QString& path, const QString& iface, const QString& method, const QVariantList& args = {});
     void callManager(const QString& method);
     void callSession(const QString& method);
@@ -49,4 +49,4 @@ private:
     QString m_sessionPath;
 };
 
-} // namespace caelestia::services
+} // namespace caelestia::shell::services

@@ -4,17 +4,10 @@
 #include <qqmlparserstatus.h>
 #include <qquickattachedpropertypropagator.h>
 
-namespace caelestia::config {
+#include "anim.hpp"
+#include "rootnodes.hpp"
 
-class AnimTokens;
-class AppearancePadding;
-class AppearanceRounding;
-class AppearanceSpacing;
-class AppearanceTransparency;
-class FontTokens;
-class GlobalConfig;
-class SizeTokens;
-class TokenConfig;
+namespace caelestia::shell::config {
 
 class Tokens : public QQuickAttachedPropertyPropagator, public QQmlParserStatus {
     Q_OBJECT
@@ -22,19 +15,16 @@ class Tokens : public QQuickAttachedPropertyPropagator, public QQmlParserStatus 
     QML_ELEMENT
     QML_UNCREATABLE("")
     QML_ATTACHED(Tokens)
-    Q_MOC_INCLUDE("anim.hpp")
-    Q_MOC_INCLUDE("appearanceconfig.hpp")
-    Q_MOC_INCLUDE("font.hpp")
-    Q_MOC_INCLUDE("tokens.hpp")
 
     Q_PROPERTY(QString screen READ screen WRITE inheritScreen NOTIFY sourceChanged)
-    Q_PROPERTY(const caelestia::config::AppearanceRounding* rounding READ rounding NOTIFY sourceChanged)
-    Q_PROPERTY(const caelestia::config::AppearanceSpacing* spacing READ spacing NOTIFY sourceChanged)
-    Q_PROPERTY(const caelestia::config::AppearancePadding* padding READ padding NOTIFY sourceChanged)
-    Q_PROPERTY(const caelestia::config::AppearanceTransparency* transparency READ transparency NOTIFY sourceChanged)
-    Q_PROPERTY(const caelestia::config::SizeTokens* sizes READ sizes NOTIFY sourceChanged)
-    Q_PROPERTY(const caelestia::config::FontTokens* font READ font NOTIFY sourceChanged)
-    Q_PROPERTY(const caelestia::config::AnimTokens* anim READ anim NOTIFY sourceChanged)
+    Q_PROPERTY(const caelestia::shell::config::AppearanceRounding* rounding READ rounding NOTIFY sourceChanged)
+    Q_PROPERTY(const caelestia::shell::config::AppearanceSpacing* spacing READ spacing NOTIFY sourceChanged)
+    Q_PROPERTY(const caelestia::shell::config::AppearancePadding* padding READ padding NOTIFY sourceChanged)
+    Q_PROPERTY(
+        const caelestia::shell::config::AppearanceTransparency* transparency READ transparency NOTIFY sourceChanged)
+    Q_PROPERTY(const caelestia::shell::config::SizeTokens* sizes READ sizes NOTIFY sourceChanged)
+    Q_PROPERTY(const caelestia::shell::config::FontTokens* font READ font NOTIFY sourceChanged)
+    Q_PROPERTY(const caelestia::shell::config::AnimTokens* anim READ anim CONSTANT)
 
 public:
     explicit Tokens(QObject* parent = nullptr);
@@ -45,15 +35,18 @@ public:
     [[nodiscard]] const AppearanceRounding* rounding() const;
     [[nodiscard]] const AppearanceSpacing* spacing() const;
     [[nodiscard]] const AppearancePadding* padding() const;
-    [[nodiscard]] const AppearanceTransparency* transparency() const;
+    [[nodiscard]] static const AppearanceTransparency* transparency();
 
     [[nodiscard]] const SizeTokens* sizes() const;
     [[nodiscard]] const FontTokens* font() const;
-    [[nodiscard]] const AnimTokens* anim() const;
+    [[nodiscard]] static const AnimTokens* anim();
 
-    [[nodiscard]] Q_INVOKABLE static TokenConfig* forScreen(const QString& screen);
+    [[nodiscard]] Q_INVOKABLE static TokensRoot* forScreen(const QString& screen);
 
     static Tokens* qmlAttachedProperties(QObject* object);
+
+    void classBegin() override;
+    void componentComplete() override;
 
 signals:
     void sourceChanged();
@@ -63,19 +56,12 @@ protected:
         QQuickAttachedPropertyPropagator* newParent, QQuickAttachedPropertyPropagator* oldParent) override;
 
 private:
-    void classBegin() override;
-    void componentComplete() override;
-
     void propagateScreen();
-    void bindAnim();
-    void bindFont();
 
     bool m_complete = false;
     QString m_screen;
-    GlobalConfig* m_config = nullptr;
-    TokenConfig* m_tokens = nullptr;
-    FontTokens* m_font = nullptr;
-    AnimTokens* m_anim = nullptr;
+    ConfigRoot* m_config = nullptr;
+    TokensRoot* m_tokens = nullptr;
 };
 
-} // namespace caelestia::config
+} // namespace caelestia::shell::config

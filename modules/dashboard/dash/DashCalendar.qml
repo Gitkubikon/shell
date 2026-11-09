@@ -4,6 +4,7 @@ import qs.components
 import qs.components.controls
 import qs.services
 import Caelestia.Config
+import Caelestia.I18n
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -320,7 +321,7 @@ Item {
                 }
 
                 // Blurred background
-                StyledClippingRect {
+                ClipRect {
                     anchors.fill: parent
                     radius: overlayCard.radius
 
@@ -532,7 +533,7 @@ Item {
                                     StyledText {
                                         text: {
                                             const d = modelData && modelData.startDate ? new Date(modelData.startDate) : null;
-                                            return d && !isNaN(d) ? Qt.formatDateTime(d, GlobalConfig.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
+                                            return d && !isNaN(d) ? Qt.formatDateTime(d, Units.twelveHourClock ? "hh:mm AP" : "hh:mm") : "";
                                         }
                                         font: Tokens.font.body.builders.small.weight(Font.Medium).build()
                                         color: Colours.palette.m3onSurfaceVariant
@@ -549,7 +550,7 @@ Item {
                                         id: timeEnd
                                         text: {
                                             const d = modelData && modelData.endDate ? new Date(modelData.endDate) : null;
-                                            return d && !isNaN(d) ? Qt.formatDateTime(d, GlobalConfig.services.useTwelveHourClock ? "hh:mm AP" : "hh:mm") : "";
+                                            return d && !isNaN(d) ? Qt.formatDateTime(d, Units.twelveHourClock ? "hh:mm AP" : "hh:mm") : "";
                                         }
                                         font: Tokens.font.body.small
                                         color: Colours.palette.m3onSurfaceVariant

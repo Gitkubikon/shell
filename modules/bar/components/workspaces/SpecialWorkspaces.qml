@@ -1,212 +1,245 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
+import Caelestia
+import Caelestia.Components
 import Caelestia.Config
 import qs.components
+import qs.components.effects
 import qs.services
-import qs.utils
 
 Item {
     id: root
 
-    required property ShellScreen screen
-    readonly property HyprlandMonitor monitor: Hypr.monitorFor(screen)
-    readonly property string activeSpecial: (GlobalConfig.bar.workspaces.perMonitorWorkspaces ? monitor : Hypr.focusedMonitor)?.lastIpcObject.specialWorkspace?.name ?? ""
+    required property HyprlandMonitor monitor
 
-    ListView {
-        id: view
+    // Local: keyed by name, not id (Hyprland 0.57 gives special workspaces no id).
+    // Sorted by leading number so per-monitor scratchpads (special:<N>-<MONITOR>,
+    // see ~/.config/caelestia/scripts/workspace-mode.fish) appear in order.
+    readonly property string activeSpecialName: monitor?.lastIpcObject.specialWorkspace?.name ?? ""
+    readonly property var wsNames: {
+        const allMonitors = !Config.bar.workspaces.perMonitor;
+        const num = name => parseInt(Hypr.trimWsName(name));
+        return Hypr.workspaces.values.filter(w => w.name.startsWith("special:") && (allMonitors || w.monitor === root.monitor)).map(w => w.name).sort((a, b) => {
+            const na = num(a);
+            const nb = num(b);
+            if (isNaN(na) !== isNaN(nb))
+                return isNaN(na) ? 1 : -1;
+            if (!isNaN(na) && na !== nb)
+                return na - nb;
+            return a.localeCompare(b);
+        });
+    }
+    readonly property int activeIdx: wsNames.indexOf(activeSpecialName)
+    readonly property real maxViewY: Math.max(0, view.contentHeight - height)
 
-        anchors.fill: parent
-        spacing: Tokens.spacing.extraSmall
-        interactive: false
+    readonly property Workspace activeWs: {
+        CUtils.dependency(view.itemsDirty);
+        return view.itemAtIndex(activeIdx) as Workspace;
+    }
 
-        currentIndex: model.values.findIndex(w => w.name === root.activeSpecial)
-        onCurrentIndexChanged: currentIndex = Qt.binding(() => model.values.findIndex(w => w.name === root.activeSpecial))
+    function ensureVisible(animate = true): void {
+        if (!activeWs)
+            return;
 
-        // Local: sort special workspaces by their numeric suffix so the order is stable
-        model: ScriptModel {
-            values: Hypr.workspaces.values.filter(w => w.name.startsWith("special:") && (!GlobalConfig.bar.workspaces.perMonitorWorkspaces || w.monitor === root.monitor)).sort((a, b) => {
-                const aNum = parseInt(a.name.slice(8));
-                const bNum = parseInt(b.name.slice(8));
-                if (isNaN(aNum) && isNaN(bNum))
-                    return 0;
-                if (isNaN(aNum))
-                    return 1;
-                if (isNaN(bNum))
-                    return -1;
-                return aNum - bNum;
-            })
+        const top = activeWs.LazyListView.layoutY;
+        const bottom = top + activeWs.LazyListView.preferredHeight;
+
+        let target = view.y;
+        if (top < -target)
+            target = -top;
+        else if (bottom > -target + height)
+            target = -(bottom - height);
+
+        target = CUtils.clamp(target, -maxViewY, 0);
+        if (target !== view.y) {
+            if (animate) {
+                const type = viewYAnim.type;
+                viewYAnim.type = Anim.DefaultSpatial;
+                view.y = target;
+                viewYAnim.type = type;
+            } else {
+                viewYBehavior.enabled = false;
+                view.y = target;
+                viewYBehavior.enabled = true;
+            }
+        }
+    }
+
+    onActiveWsChanged: ensureVisible()
+    onHeightChanged: ensureVisible(false)
+    Component.onCompleted: ensureVisible(false)
+    onMaxViewYChanged: ensureVisible()
+
+    layer.enabled: true
+    layer.effect: Mask {
+        maskSource: mask
+    }
+
+    Connections {
+        function onLayoutYChanged(): void {
+            root.ensureVisible();
         }
 
-        // Local: the pill highlight is animated by hand, so disable the built in one
-        highlightFollowsCurrentItem: false
-        highlightMoveDuration: 0
+        function onPreferredHeightChanged(): void {
+            root.ensureVisible();
+        }
 
-        highlight: Config.bar.workspaces.activeIndicator ? highlightComp : null
+        target: root.activeWs?.LazyListView ?? null
+    }
 
-        delegate: SpecialWsDelegate {}
+    Item {
+        id: mask
 
-        Component {
-            id: highlightComp
+        anchors.fill: parent
+        layer.enabled: true
+        visible: false
 
-            StyledRect {
-                // Bind to currentItem position manually for proper easing
-                y: view.currentItem?.y ?? 0
-                implicitWidth: Tokens.sizes.bar.innerWidth - Tokens.padding.small
-                implicitHeight: view.currentItem?.implicitHeight ?? 0
-                radius: Tokens.rounding.full
-                color: Colours.palette.m3primary
-                visible: view.currentIndex >= 0
+        Rectangle {
+            anchors.fill: parent
+            radius: Tokens.rounding.full
 
-                // Scale in on first appearance
-                scale: 0
-                Component.onCompleted: scale = 1
+            gradient: Gradient {
+                orientation: Gradient.Vertical
 
-                Behavior on y {
-                    Anim {
-                        type: Anim.Emphasized
-                    }
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(0, 0, 0, 0)
                 }
-
-                Behavior on implicitHeight {
-                    Anim {
-                        type: Anim.Emphasized
-                    }
+                GradientStop {
+                    position: 0.2
+                    color: Qt.rgba(0, 0, 0, 1)
                 }
-
-                Behavior on scale {
-                    Anim {
-                        easing: Tokens.anim.standardDecel
-                    }
+                GradientStop {
+                    position: 0.8
+                    color: Qt.rgba(0, 0, 0, 1)
+                }
+                GradientStop {
+                    position: 1
+                    color: Qt.rgba(0, 0, 0, 0)
                 }
             }
+        }
+
+        Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+
+            radius: Tokens.rounding.full
+            implicitHeight: parent.height / 2
+            opacity: view.y < -Tokens.padding.extraSmall ? 0 : 1
+
+            Behavior on opacity {
+                Anim {
+                    type: Anim.DefaultEffects
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+
+            radius: Tokens.rounding.full
+            implicitHeight: parent.height / 2
+            opacity: view.y > -root.maxViewY + Tokens.padding.extraSmall ? 0 : 1
+
+            Behavior on opacity {
+                Anim {
+                    type: Anim.DefaultEffects
+                }
+            }
+        }
+    }
+
+    LazyListView {
+        id: view
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        implicitHeight: contentHeight
+
+        cullDelegates: false
+        spacing: Tokens.spacing.small
+        removeDuration: Tokens.anim.durations.expressiveDefaultEffects
+
+        onContentHeightChanged: root.ensureVisible()
+
+        model: ScriptModel {
+            values: root.wsNames
+        }
+
+        delegate: Workspace {
+            activeWsId: -1
+            ws: -1
+            wsName: modelData
+            activeWsName: root.activeSpecialName
+            monitor: root.monitor
+            offMonitorColour: Colours.palette.m3outline
+            displayType: Config.bar.workspaces.specialDisplayType
+            showWindows: Config.bar.workspaces.showWindowsOnSpecialWorkspaces
+            iconRules: GlobalConfig.bar.workspaces.specialWorkspaceIcons
+        }
+
+        Behavior on y {
+            id: viewYBehavior
+
+            Anim {
+                id: viewYAnim
+
+                type: Anim.FastEffects
+            }
+        }
+    }
+
+    Loader {
+        asynchronous: true
+        anchors.left: view.left
+        anchors.right: view.right
+        active: Config.bar.workspaces.activeIndicator
+
+        sourceComponent: ActiveIndicator {
+            activeWs: root.activeWs
+            mask: view
+            color: Colours.palette.m3tertiary
+            contentColour: Colours.palette.m3onTertiary
         }
     }
 
     MouseArea {
         property real startY
+        property real startViewY
+        property bool dragging
 
-        anchors.fill: view
+        anchors.fill: parent
 
-        drag.target: view.contentItem
-        drag.axis: Drag.YAxis
-        drag.maximumY: 0
-        drag.minimumY: Math.min(0, view.height - view.contentHeight - Tokens.padding.extraSmall)
+        onPressed: event => {
+            startY = event.y;
+            startViewY = view.y;
+            dragging = false;
+        }
 
-        onPressed: event => startY = event.y
+        onPositionChanged: event => {
+            if (!dragging && Math.abs(event.y - startY) > drag.threshold)
+                dragging = true;
+
+            if (dragging)
+                view.y = CUtils.clamp(startViewY + (event.y - startY), -root.maxViewY, 0);
+        }
 
         onClicked: event => {
-            if (Math.abs(event.y - startY) > drag.threshold)
+            if (dragging)
                 return;
 
-            const ws = view.itemAt(event.x, event.y) as SpecialWsDelegate;
-            if (ws?.modelData)
-                Hypr.dispatch(Hypr.usingLua ? `hl.dsp.workspace.toggle_special("${ws.modelData.name.slice(8)}")` : `togglespecialworkspace ${ws.modelData.name.slice(8)}`);
-            else
-                Hypr.dispatch(Hypr.usingLua ? 'hl.dsp.workspace.toggle_special("special")' : "togglespecialworkspace special");
-        }
-    }
-
-    component SpecialWsDelegate: ColumnLayout {
-        id: ws
-
-        required property HyprlandWorkspace modelData
-
-        readonly property bool isActive: modelData.name === root.activeSpecial
-        readonly property bool isOccupied: modelData.lastIpcObject.windows > 0
-        readonly property bool hasWindows: isOccupied && Config.bar.workspaces.showWindowsOnSpecialWorkspaces
-        readonly property string icon: Icons.getSpecialWsIcon(modelData.name)
-        readonly property color fgColour: isActive && Config.bar.workspaces.activeIndicator ? Colours.palette.m3onPrimary : Config.bar.workspaces.occupiedBg || isOccupied ? Colours.palette.m3onSurface : Colours.layer(Colours.palette.m3outlineVariant, 2)
-
-        anchors.left: view.contentItem.left
-        anchors.right: view.contentItem.right
-
-        spacing: 0
-
-        Loader {
-            id: label
-
-            Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
-            Layout.preferredHeight: Tokens.sizes.bar.innerWidth - Tokens.padding.small
-
-            sourceComponent: ws.icon.length === 1 ? letterComp : iconComp
-
-            Component {
-                id: iconComp
-
-                MaterialIcon {
-                    fill: 1
-                    text: ws.icon
-                    color: ws.fgColour
-                    verticalAlignment: Qt.AlignVCenter
-                }
-            }
-
-            Component {
-                id: letterComp
-
-                StyledText {
-                    font: Tokens.font.body.builders.small.scale(0.85).build()
-                    text: ws.icon
-                    color: ws.fgColour
-                    verticalAlignment: Qt.AlignVCenter
-                    horizontalAlignment: Qt.AlignHCenter
-                    elide: Text.ElideNone
-                    wrapMode: Text.NoWrap
-                }
-            }
-        }
-
-        Loader {
-            id: windows
-
-            asynchronous: true
-
-            Layout.alignment: Qt.AlignHCenter
-            Layout.fillHeight: true
-            Layout.topMargin: -Tokens.sizes.bar.innerWidth / 10
-
-            visible: active
-            active: ws.hasWindows
-
-            // Local: show a dot per window instead of per app icons
-            sourceComponent: Column {
-                spacing: 0
-
-                add: Transition {
-                    Anim {
-                        properties: "scale"
-                        from: 0
-                        to: 1
-                        easing: Tokens.anim.standardDecel
-                    }
-                }
-
-                move: Transition {
-                    Anim {
-                        properties: "scale"
-                        to: 1
-                        easing: Tokens.anim.standardDecel
-                    }
-                    Anim {
-                        properties: "x,y"
-                    }
-                }
-
-                Repeater {
-                    model: ws.modelData?.lastIpcObject.windows ?? 0
-
-                    StyledRect {
-                        implicitWidth: 8
-                        implicitHeight: 8
-                        radius: Tokens.rounding.full
-                        color: Colours.palette.m3primary
-                        opacity: 0.6
-                    }
-                }
+            const ws = view.itemAt(event.x, event.y - view.y) as Workspace;
+            if (ws) {
+                Hypr.toggleSpecial(Hypr.trimWsName(ws.wsName));
+            } else {
+                Hypr.toggleSpecial("special");
             }
         }
     }

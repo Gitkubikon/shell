@@ -2,6 +2,7 @@
 
 #include <qabstractitemmodel.h>
 #include <qdir.h>
+#include <qdiriterator.h>
 #include <qfilesystemwatcher.h>
 #include <qfuture.h>
 #include <qimagereader.h>
@@ -10,7 +11,7 @@
 #include <qqmlintegration.h>
 #include <qqmllist.h>
 
-namespace caelestia::models {
+namespace caelestia::shell::models {
 
 class FileSystemEntry : public QObject {
     Q_OBJECT
@@ -29,7 +30,7 @@ class FileSystemEntry : public QObject {
     Q_PROPERTY(QString mimeType READ mimeType CONSTANT)
 
 public:
-    explicit FileSystemEntry(const QString& path, const QString& relativePath, QObject* parent = nullptr);
+    explicit FileSystemEntry(const QString& path, QString relativePath, QObject* parent = nullptr);
 
     [[nodiscard]] QString path() const;
     [[nodiscard]] QString relativePath() const;
@@ -62,32 +63,35 @@ private:
 
 class FileSystemModel : public QAbstractListModel {
     Q_OBJECT
-    QML_ELEMENT
+    QML_NAMED_ELEMENT(FileSystemModel)
 
     Q_PROPERTY(QString path READ path WRITE setPath NOTIFY pathChanged)
     Q_PROPERTY(bool recursive READ recursive WRITE setRecursive NOTIFY recursiveChanged)
     Q_PROPERTY(bool watchChanges READ watchChanges WRITE setWatchChanges NOTIFY watchChangesChanged)
     Q_PROPERTY(bool showHidden READ showHidden WRITE setShowHidden NOTIFY showHiddenChanged)
     Q_PROPERTY(bool sortReverse READ sortReverse WRITE setSortReverse NOTIFY sortReverseChanged)
-    Q_PROPERTY(Filter filter READ filter WRITE setFilter NOTIFY filterChanged)
+    Q_PROPERTY(
+        caelestia::shell::models::FileSystemModel::Filters filter READ filter WRITE setFilter NOTIFY filterChanged)
     Q_PROPERTY(QStringList nameFilters READ nameFilters WRITE setNameFilters NOTIFY nameFiltersChanged)
 
-    Q_PROPERTY(QQmlListProperty<caelestia::models::FileSystemEntry> entries READ entries NOTIFY entriesChanged)
+    Q_PROPERTY(QQmlListProperty<caelestia::shell::models::FileSystemEntry> entries READ entries NOTIFY entriesChanged)
 
 public:
-    enum Filter {
-        NoFilter,
-        Images,
-        Files,
-        Dirs
+    enum class Filter : quint8 {
+        NoFilter = 0x0,
+        Images = 0x1,
+        Videos = 0x2,
+        Files = 0x4,
+        Dirs = 0x8,
     };
-    Q_ENUM(Filter)
+    Q_DECLARE_FLAGS(Filters, Filter)
+    Q_FLAG(Filters)
 
     explicit FileSystemModel(QObject* parent = nullptr);
 
-    int rowCount(const QModelIndex& parent = QModelIndex()) const override;
-    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
-    QHash<int, QByteArray> roleNames() const override;
+    [[nodiscard]] int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+    [[nodiscard]] QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+    [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
 
     [[nodiscard]] QString path() const;
     void setPath(const QString& path);
@@ -104,8 +108,8 @@ public:
     [[nodiscard]] bool sortReverse() const;
     void setSortReverse(bool sortReverse);
 
-    [[nodiscard]] Filter filter() const;
-    void setFilter(Filter filter);
+    [[nodiscard]] Filters filter() const;
+    void setFilter(Filters filter);
 
     [[nodiscard]] QStringList nameFilters() const;
     void setNameFilters(const QStringList& nameFilters);
@@ -123,17 +127,28 @@ signals:
     void entriesChanged();
 
 private:
+    struct PathDiff {
+        QSet<QString> removed;
+        QSet<QString> added;
+    };
+
+    struct ScanFilters {
+        QStringList nameFilters;
+        QDir::Filters filters;
+        std::function<bool(const QString&)> filterFn = nullptr;
+    };
+
     QDir m_dir;
     QFileSystemWatcher m_watcher;
     QList<FileSystemEntry*> m_entries;
-    QHash<QString, QFuture<QPair<QSet<QString>, QSet<QString>>>> m_futures;
+    QHash<QString, QFuture<PathDiff>> m_futures;
 
     QString m_path;
     bool m_recursive;
     bool m_watchChanges;
     bool m_showHidden;
     bool m_sortReverse = false;
-    Filter m_filter;
+    Filters m_filter;
     QStringList m_nameFilters;
 
     void watchDirIfRecursive(const QString& path);
@@ -141,8 +156,13 @@ private:
     void updateWatcher();
     void updateEntries();
     void updateEntriesForDir(const QString& dir);
+    [[nodiscard]] static ScanFilters filtersFor(Filters filter, const QStringList& nameFilters, bool showHidden);
+    [[nodiscard]] static std::optional<QSet<QString>> scanDir(const QString& dir, const ScanFilters& filters,
+        QDirIterator::IteratorFlags flags, const QPromise<PathDiff>& promise);
     void applyChanges(const QSet<QString>& removedPaths, const QSet<QString>& addedPaths);
     [[nodiscard]] bool compareEntries(const FileSystemEntry* a, const FileSystemEntry* b) const;
 };
 
-} // namespace caelestia::models
+} // namespace caelestia::shell::models
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(caelestia::shell::models::FileSystemModel::Filters)

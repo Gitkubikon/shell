@@ -3,8 +3,8 @@
 /.qmlls.ini
 build/
 .cache/
-.local/
 logs
+.local/
 build-merge/
 build.bak/
 __pycache__/

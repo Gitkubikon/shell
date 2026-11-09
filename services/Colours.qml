@@ -4,8 +4,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Caelestia
 import Caelestia.Config
+import Caelestia.Images
 import qs.services
 import qs.utils
 
@@ -60,8 +60,8 @@ Singleton {
     }
 
     function load(data: string, isPreview: bool): void {
-        const scheme = JSON.parse(data);
         const colours = isPreview ? preview : current;
+        const scheme = JSON.parse(data);
 
         if (!isPreview) {
             root.scheme = scheme.name;
