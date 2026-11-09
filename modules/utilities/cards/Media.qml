@@ -77,32 +77,18 @@ StyledRect {
 
     /**
      * Hides the shell then runs cmd. Area based tools need the panels gone
-     * before they grab the screen, so those get a short delay.
+     * before they grab the screen, so those get a short delay. The delay runs
+     * from ShellState: this card is unloaded as soon as the panel hides, so a
+     * Timer here would be destroyed before it fires.
      */
-    function exec(cmd: var, delayed: bool): void {
+    function exec(cmd: list<string>, delayed: bool): void {
         root.screenState.utilities = false;
         root.screenState.sidebar = false;
 
-        if (delayed) {
-            pendingCommand = cmd;
-            delayTimer.restart();
-        } else {
+        if (delayed)
+            ShellState.execAfterHide(cmd);
+        else
             Quickshell.execDetached(cmd);
-        }
-    }
-
-    property var pendingCommand: []
-
-    Timer {
-        id: delayTimer
-
-        interval: 300
-        onTriggered: {
-            if (root.pendingCommand.length > 0) {
-                Quickshell.execDetached(root.pendingCommand);
-                root.pendingCommand = [];
-            }
-        }
     }
 
     implicitHeight: layout.implicitHeight + layout.anchors.margins * 2

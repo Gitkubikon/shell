@@ -90,14 +90,9 @@ MouseArea {
         const region = `${screenRelW}x${screenRelH}+${globalX}+${globalY}`;
 
         if (root.loader.recording) {
-            // Use CLI for recording - it handles fractional scaling conversion to physical pixels
-            const cmd = ["caelestia", "record", "-r", region];
-            if (root.loader.recordWithSound) {
-                cmd.push("-s");
-            }
-            // Start fast polling for instant recording state detection
-            Recorder.startFastPolling();
-            Quickshell.execDetached(cmd);
+            // Recorder runs `caelestia record -r <region>`; the CLI converts the
+            // logical region to physical pixels for gpu-screen-recorder.
+            Recorder.start(root.loader.recordWithSound ? ["-r", region, "-s"] : ["-r", region]);
             closeAnim.start();
         } else if (root.loader.clipboardOnly) {
             const tmpfile = Qt.resolvedUrl(`/tmp/caelestia-picker-${Quickshell.processId}-${Date.now()}.png`);

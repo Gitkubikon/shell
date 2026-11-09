@@ -21,6 +21,18 @@ Singleton {
         hotCornerTimer.restart();
     }
 
+    // Local: run cmd once the panels have animated away. Panel cards live in a
+    // Loader that unloads the moment the panel hides (the hide anim overshoots,
+    // so that is ~200ms in), which kills any Timer owned by the card before it
+    // fires. Screen grabbing tools (area picker, region record) need the panels
+    // gone first, so the delay has to live somewhere that outlives the card.
+    property list<string> pendingExec: []
+
+    function execAfterHide(cmd: list<string>): void {
+        pendingExec = cmd;
+        execAfterHideTimer.restart();
+    }
+
     function anySidebarOpen(): bool {
         return states.instances.some(s => s.sidebar);
     }
@@ -115,6 +127,18 @@ Singleton {
 
         interval: 1000
         onTriggered: ShellState.hotCornerCooldown = false
+    }
+
+    Timer {
+        id: execAfterHideTimer
+
+        interval: 300
+        onTriggered: {
+            if (ShellState.pendingExec.length > 0) {
+                Quickshell.execDetached(ShellState.pendingExec);
+                ShellState.pendingExec = [];
+            }
+        }
     }
 
     IpcHandler {

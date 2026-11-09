@@ -41,6 +41,9 @@ ColumnLayout {
 
     spacing: 0
 
+    // Quickshell.Widgets' WrapperMouseArea: a MouseArea sized to its child row.
+    // Do not shadow it with a local plain Item wrapper; that has no implicit
+    // height, so the list below ends up drawn over this header.
     WrapperMouseArea {
         Layout.fillWidth: true
 

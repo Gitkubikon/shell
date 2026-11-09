@@ -11,13 +11,13 @@ Singleton {
     readonly property alias paused: props.paused
     readonly property alias elapsed: props.elapsed
     property bool needsStart
-    property list<string> startArgs: []
+    property list<string> startArgs
     property bool needsStop
     property bool needsPause
 
     function start(extraArgs = []): void {
         needsStart = true;
-        startArgs = extraArgs || [];
+        startArgs = extraArgs;
         checkProc.running = true;
     }
 
@@ -31,12 +31,14 @@ Singleton {
         checkProc.running = true;
     }
 
-    QtObject {
+    PersistentProperties {
         id: props
 
         property bool running: false
         property bool paused: false
-        property real elapsed: 0
+        property real elapsed: 0 // Might get too large for int
+
+        reloadableId: "recorder"
     }
 
     Process {
@@ -44,32 +46,23 @@ Singleton {
 
         running: true
         command: ["pidof", "gpu-screen-recorder"]
-        onExited: code => {
-            const isActuallyRunning = (code === 0);
+        onExited: code => { // qmllint disable signal-handler-parameters
+            props.running = code === 0;
 
-            if (isActuallyRunning) {
+            if (code === 0) {
                 if (root.needsStop) {
                     Quickshell.execDetached(["caelestia", "record"]);
                     props.running = false;
                     props.paused = false;
-                    props.elapsed = 0;
                 } else if (root.needsPause) {
                     Quickshell.execDetached(["caelestia", "record", "-p"]);
                     props.paused = !props.paused;
-                } else {
-                    props.running = true;
                 }
-            } else {
-                if (root.needsStart) {
-                    Quickshell.execDetached(["caelestia", "record", ...root.startArgs]);
-                    props.running = true;
-                    props.paused = false;
-                    props.elapsed = 0;
-                } else {
-                    props.running = false;
-                    props.paused = false;
-                    props.elapsed = 0;
-                }
+            } else if (root.needsStart) {
+                Quickshell.execDetached(["caelestia", "record", ...root.startArgs]);
+                props.running = true;
+                props.paused = false;
+                props.elapsed = 0;
             }
 
             root.needsStart = false;
@@ -78,6 +71,9 @@ Singleton {
         }
     }
 
+    // Local: upstream only re-checks the recorder on start/stop/pause, so a
+    // recording started from a keybind (`caelestia record`) or one that died
+    // never shows in the UI. Poll while idle, faster while recording.
     Timer {
         interval: props.running ? 1000 : 3000
         repeat: true
@@ -90,7 +86,7 @@ Singleton {
             props.elapsed++;
         }
 
-        target: Time
+        target: Time // qmllint disable incompatible-type
         enabled: props.running && !props.paused
     }
 }
