@@ -4,7 +4,4 @@
 build/
 .cache/
 logs
-.local/
-build-merge/
-build.bak/
 __pycache__/
