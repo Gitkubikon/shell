@@ -22,7 +22,7 @@ GridLayout {
 
         radius: Tokens.rounding.extraLarge
 
-        DashUser {
+        User {
             id: user
 
             screenState: root.screenState
@@ -38,7 +38,7 @@ GridLayout {
 
         radius: Tokens.rounding.extraLarge * 1.5
 
-        DashWeather {
+        SmallWeather {
             id: weather
         }
     }
@@ -50,7 +50,7 @@ GridLayout {
 
         radius: Tokens.rounding.large
 
-        DashDateTime {
+        DateTime {
             id: dateTime
         }
     }
@@ -79,7 +79,7 @@ GridLayout {
 
         radius: Tokens.rounding.large
 
-        DashResources {
+        Resources {
             id: resources
         }
     }
