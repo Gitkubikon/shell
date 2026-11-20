@@ -10,34 +10,13 @@ import qs.modules.nexus.common
 PageBase {
     id: root
 
-    readonly property int tempMin: 1200
-    readonly property int tempMax: 6500
+    readonly property int tempRange: Hyprsunset.maxTemperature - Hyprsunset.minTemperature
+    readonly property var timePattern: /^([01]\d|2[0-3]):[0-5]\d$/
 
-    // The slider runs warm -> cool left to right, so 0 is the coolest (highest K)
-    function sliderToTemp(value: real): int {
-        return Math.round(root.tempMax - value * (root.tempMax - root.tempMin));
-    }
+    title: Tr.tr("Night light")
 
-    function tempToSlider(temp: int): real {
-        const clamped = Math.max(root.tempMin, Math.min(root.tempMax, temp));
-        return (root.tempMax - clamped) / (root.tempMax - root.tempMin);
-    }
-
-    function formatTime(timeString: string): string {
-        const parts = (timeString ?? "").split(":");
-        const hour = Number(parts[0]);
-        const minute = Number(parts[1]);
-        if (!Number.isFinite(hour) || !Number.isFinite(minute))
-            return timeString;
-
-        const d = new Date();
-        d.setHours(hour, minute, 0, 0);
-        return Qt.formatDateTime(d, Units.twelveHourClock ? "hh:mm AP" : "hh:mm");
-    }
-
-    title: qsTr("Night light")
-
-    Component.onCompleted: Hyprsunset.fetchState()
+    // The daemon can be started or killed outside the shell
+    Component.onCompleted: Hyprsunset.refresh()
 
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -45,67 +24,66 @@ PageBase {
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 
-        // General
         SectionHeader {
             first: true
-            text: qsTr("General")
+            text: Tr.tr("General")
         }
 
         ToggleRow {
             first: true
-            text: qsTr("Enable now")
-            subtext: qsTr("Reduce blue light to ease eye strain")
-            checked: Hyprsunset.active
-            onToggled: Hyprsunset.toggle(checked)
+            last: !resumeRow.visible
+            enabled: Hyprsunset.available
+            text: Tr.tr("Night light")
+            subtext: Hyprsunset.statusText
+            checked: Hyprsunset.wanted
+            onToggled: Hyprsunset.setEnabled(checked)
         }
 
-        ToggleRow {
+        RowButton {
+            id: resumeRow
+
             last: true
-            text: qsTr("Automatic schedule")
-            subtext: GlobalConfig.services.nightLight.automatic ? qsTr("Enabled between %1 and %2").arg(root.formatTime(GlobalConfig.services.nightLight.from)).arg(root.formatTime(GlobalConfig.services.nightLight.to)) : qsTr("Turn night light on and off at set times")
-            checked: GlobalConfig.services.nightLight.automatic
-            onToggled: GlobalConfig.services.nightLight.automatic = checked
+            visible: Hyprsunset.overridden
+            icon: "restart_alt"
+            text: Tr.tr("Resume schedule")
+            subtext: Tr.tr("Drop the manual change and follow the schedule again")
+            onClicked: Hyprsunset.resumeSchedule()
         }
 
-        // Colour temperature
         SectionHeader {
-            text: qsTr("Colour temperature")
+            text: Tr.tr("Colour temperature")
         }
 
         SliderRow {
             first: true
             last: true
-            icon: "brightness_medium"
-            label: qsTr("Warmth")
-            valueLabel: qsTr("%1K").arg(GlobalConfig.services.nightLight.colorTemperature)
-            value: root.tempToSlider(GlobalConfig.services.nightLight.colorTemperature)
-            onMoved: v => {
-                const temp = root.sliderToTemp(v);
-                GlobalConfig.services.nightLight.colorTemperature = temp;
-                if (temp >= root.tempMax) {
-                    if (Hyprsunset.active)
-                        Hyprsunset.toggle(false);
-                } else if (!Hyprsunset.active) {
-                    Hyprsunset.toggle(true);
-                }
-            }
+            icon: "thermostat"
+            label: Tr.tr("Warmth")
+            valueLabel: Tr.tr("%1K").arg(Hyprsunset.temperature)
+            value: (Hyprsunset.maxTemperature - Hyprsunset.temperature) / root.tempRange
+            onMoved: v => Hyprsunset.setTemperature(Hyprsunset.maxTemperature - v * root.tempRange)
         }
 
-        // Schedule
         SectionHeader {
-            text: qsTr("Schedule")
+            text: Tr.tr("Schedule")
+        }
+
+        ToggleRow {
+            first: true
+            text: Tr.tr("Automatic schedule")
+            subtext: Tr.tr("Turn on and off at set times. Switching by hand lasts until the next change.")
+            checked: Hyprsunset.automatic
+            onToggled: Hyprsunset.setAutomatic(checked)
         }
 
         TextFieldRow {
-            first: true
-            label: qsTr("From")
-            subtext: qsTr("Time night light turns on")
-            errorText: qsTr("Must be a 24 hour time, e.g. 20:00")
+            label: Tr.tr("Turn on at")
+            errorText: Tr.tr("Must be a 24 hour time, e.g. 20:00")
             value: GlobalConfig.services.nightLight.from
             placeholderText: "20:00"
             maximumLength: 5
             smallField: true
-            validate: /^([01]\d|2[0-3]):[0-5]\d$/
+            validate: root.timePattern
             onEditingFinished: value => {
                 if (field.valid)
                     GlobalConfig.services.nightLight.from = value;
@@ -114,32 +92,30 @@ PageBase {
 
         TextFieldRow {
             last: true
-            label: qsTr("To")
-            subtext: qsTr("Time night light turns off")
-            errorText: qsTr("Must be a 24 hour time, e.g. 08:00")
+            label: Tr.tr("Turn off at")
+            errorText: Tr.tr("Must be a 24 hour time, e.g. 08:00")
             value: GlobalConfig.services.nightLight.to
             placeholderText: "08:00"
             maximumLength: 5
             smallField: true
-            validate: /^([01]\d|2[0-3]):[0-5]\d$/
+            validate: root.timePattern
             onEditingFinished: value => {
                 if (field.valid)
                     GlobalConfig.services.nightLight.to = value;
             }
         }
 
-        // About
         SectionHeader {
-            text: qsTr("About")
+            text: Tr.tr("About")
         }
 
         InfoRow {
             first: true
             last: true
             icon: "info"
-            label: qsTr("Powered by hyprsunset")
-            subtext: qsTr("Lower temperatures are warmer (more red), higher are cooler (more blue)")
-            value: Hyprsunset.active ? qsTr("Active") : qsTr("Off")
+            label: Tr.tr("Powered by hyprsunset")
+            subtext: Tr.tr("Lower temperatures are warmer (more red), higher are cooler (more blue)")
+            value: Hyprsunset.available ? (Hyprsunset.active ? Tr.tr("Running") : Tr.tr("Stopped")) : Tr.tr("Not installed")
         }
     }
 }

@@ -9,39 +9,8 @@ import qs.services
 StyledRect {
     id: root
 
-    readonly property int tempMin: 1200
-    readonly property int tempMax: 6500
-    readonly property string scheduleText: formatSchedule(GlobalConfig.services.nightLight.from, GlobalConfig.services.nightLight.to)
-    readonly property real nonAnimHeight: layout.implicitHeight + Tokens.padding.extraLargeIncreased
-
-    function formatTimeString(timeString: string): string {
-        const parts = (timeString ?? "").split(":");
-        const hour = Number(parts[0]);
-        const minute = Number(parts[1]);
-        if (!Number.isFinite(hour) || !Number.isFinite(minute))
-            return "";
-
-        const d = new Date();
-        d.setHours(hour, minute, 0, 0);
-        return Qt.formatDateTime(d, Units.twelveHourClock ? "hh:mm AP" : "hh:mm");
-    }
-
-    function formatSchedule(fromString: string, toString: string): string {
-        const fromFormatted = formatTimeString(fromString);
-        const toFormatted = formatTimeString(toString);
-        if (fromFormatted.length && toFormatted.length)
-            return `${fromFormatted} - ${toFormatted}`;
-        return `${fromString} - ${toString}`;
-    }
-
-    function sliderToTemp(value: real): int {
-        return Math.round(root.tempMax - value * (root.tempMax - root.tempMin));
-    }
-
-    function tempToSlider(temp: int): real {
-        const clamped = Math.max(root.tempMin, Math.min(root.tempMax, temp));
-        return (root.tempMax - clamped) / (root.tempMax - root.tempMin);
-    }
+    readonly property real nonAnimHeight: layout.implicitHeight + Tokens.padding.large * 2
+    readonly property int tempRange: Hyprsunset.maxTemperature - Hyprsunset.minTemperature
 
     implicitHeight: nonAnimHeight
 
@@ -49,7 +18,8 @@ StyledRect {
     color: Colours.tPalette.m3surfaceContainer
     clip: true
 
-    Component.onCompleted: Hyprsunset.fetchState()
+    // The daemon can be started or killed outside the shell
+    Component.onCompleted: Hyprsunset.refresh()
 
     ColumnLayout {
         id: layout
@@ -69,14 +39,14 @@ StyledRect {
                 implicitHeight: icon.implicitHeight + Tokens.padding.large
 
                 radius: Tokens.rounding.full
-                color: Hyprsunset.active ? Colours.palette.m3secondary : Colours.palette.m3secondaryContainer
+                color: Hyprsunset.wanted ? Colours.palette.m3secondary : Colours.palette.m3secondaryContainer
 
                 MaterialIcon {
                     id: icon
 
                     anchors.centerIn: parent
-                    text: GlobalConfig.services.nightLight.automatic ? "schedule" : "bedtime"
-                    color: Hyprsunset.active ? Colours.palette.m3onSecondary : Colours.palette.m3onSecondaryContainer
+                    text: Hyprsunset.wanted ? "bedtime" : "bedtime_off"
+                    color: Hyprsunset.wanted ? Colours.palette.m3onSecondary : Colours.palette.m3onSecondaryContainer
                     fontStyle: Tokens.font.icon.large
                 }
             }
@@ -87,15 +57,15 @@ StyledRect {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: qsTr("Night Light")
+                    text: Tr.tr("Night light")
                     font: Tokens.font.body.medium
                     elide: Text.ElideRight
                 }
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: qsTr("%1 • %2K • %3").arg(Hyprsunset.active ? qsTr("Active now") : qsTr("Off")).arg(GlobalConfig.services.nightLight.colorTemperature).arg(root.scheduleText)
-                    color: Colours.palette.m3onSurfaceVariant
+                    text: Hyprsunset.statusText
+                    color: Hyprsunset.available ? Colours.palette.m3onSurfaceVariant : Colours.palette.m3error
                     font: Tokens.font.body.small
                     elide: Text.ElideRight
                     animate: true
@@ -103,49 +73,80 @@ StyledRect {
             }
 
             StyledSwitch {
-                checked: Hyprsunset.active
-                onToggled: Hyprsunset.toggle(checked)
+                enabled: Hyprsunset.available
+                checked: Hyprsunset.wanted
+                onToggled: Hyprsunset.setEnabled(checked)
             }
         }
 
-        StyledSlider {
+        // Left is cool (high K), right is warm (low K)
+        RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: Tokens.spacing.small
+            spacing: Tokens.spacing.small
 
-            implicitHeight: Tokens.padding.medium * 2
-            radius: Tokens.rounding.small
+            MaterialIcon {
+                text: "light_mode"
+                color: Colours.palette.m3outline
+                fontStyle: Tokens.font.icon.small
+            }
 
-            value: root.tempToSlider(GlobalConfig.services.nightLight.colorTemperature)
-            onInteraction: v => {
-                const temp = root.sliderToTemp(v);
-                GlobalConfig.services.nightLight.colorTemperature = temp;
-                if (temp >= root.tempMax) {
-                    if (Hyprsunset.active)
-                        Hyprsunset.toggle(false);
-                } else if (!Hyprsunset.active) {
-                    Hyprsunset.toggle(true);
+            StyledSlider {
+                Layout.fillWidth: true
+
+                implicitHeight: Tokens.padding.medium * 2
+                radius: Tokens.rounding.small
+                enabled: Hyprsunset.available
+
+                value: (Hyprsunset.maxTemperature - Hyprsunset.temperature) / root.tempRange
+                onInteraction: v => Hyprsunset.setTemperature(Hyprsunset.maxTemperature - v * root.tempRange)
+            }
+
+            MaterialIcon {
+                text: "bedtime"
+                color: Colours.palette.m3outline
+                fontStyle: Tokens.font.icon.small
+            }
+
+            StyledText {
+                Layout.minimumWidth: tempMetrics.advanceWidth
+                horizontalAlignment: Text.AlignRight
+                text: Tr.tr("%1K").arg(Hyprsunset.temperature)
+                color: Colours.palette.m3onSurfaceVariant
+                font: Tokens.font.label.medium
+
+                TextMetrics {
+                    id: tempMetrics
+
+                    text: "0000K"
+                    font: Tokens.font.label.medium
                 }
             }
         }
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: -Tokens.spacing.small
+            spacing: Tokens.spacing.small
 
-            StyledText {
-                text: qsTr("%1K").arg(root.tempMax)
-                color: Colours.palette.m3outline
-                font: Tokens.font.label.small
+            IconTextButton {
+                type: IconTextButton.Tonal
+                isToggle: true
+                checked: Hyprsunset.automatic
+                icon: "schedule"
+                text: Hyprsunset.scheduleText
+                disabled: !Hyprsunset.available
+                onClicked: Hyprsunset.setAutomatic(!Hyprsunset.automatic)
             }
 
             Item {
                 Layout.fillWidth: true
             }
 
-            StyledText {
-                text: qsTr("%1K").arg(root.tempMin)
-                color: Colours.palette.m3outline
-                font: Tokens.font.label.small
+            IconTextButton {
+                visible: Hyprsunset.overridden
+                type: IconTextButton.Text
+                icon: "restart_alt"
+                text: Tr.tr("Resume schedule")
+                onClicked: Hyprsunset.resumeSchedule()
             }
         }
     }

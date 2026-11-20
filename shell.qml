@@ -25,6 +25,7 @@ ShellRoot {
         Notifs;
         Players;
         Brightness;
+        Hyprsunset; // Local: night light schedule must run without the utilities card
         Weather.reload();
 
         if (GlobalConfig.utilities.vpn.enabled)

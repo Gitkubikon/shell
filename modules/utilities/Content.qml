@@ -43,7 +43,7 @@ Item {
             id: nightLight
 
             Layout.fillWidth: true
-            // No dedicated config key upstream; night light is a local feature and always shown
+            // Local feature, no config key: always shown
             active: true
             visible: active
 
